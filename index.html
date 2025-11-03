@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Relatórios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bibliotecas de Exportação -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* bg-slate-50 */
+        }
+        /* Estilo para o spinner de carregamento inicial */
+        #initial-loading {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(248, 250, 252, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        /* Esconde inputs de edição por padrão */
+        .edit-input { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50">
+
+    <!-- Loading Inicial -->
+    <div id="initial-loading">
+        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="mt-4 text-slate-600">Carregando relatórios...</p>
+    </div>
+
+    <!-- Elemento de Notificação -->
+    <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-md shadow-lg text-white transition-opacity duration-300 max-w-sm">
+        <p id="notification-message"></p>
+    </div>
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">Portal de Relatórios</h1>
+                <p class="text-slate-600 mt-1">Filtre, edite e exporte os dados financeiros.</p>
+            </div>
+            <div class="flex items-center space-x-4 md:space-x-6 mt-4 sm:mt-0">
+                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo J&T Express" class="h-16 w-auto" onerror="this.style.display='none'">
+            </div>
+        </header>
+
+        <!-- Filtros -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-slate-800 mb-4">Filtros de Relatório</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Filtros de Data -->
+                <div>
+                    <label for="filter-date-start" class="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
+                    <input type="date" id="filter-date-start" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="filter-date-end" class="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
+                    <input type="date" id="filter-date-end" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                 <!-- Botão de Filtro -->
+                 <div class="flex items-end">
+                    <button id="filter-btn" class="w-full md:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 flex items-center justify-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L13 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 019 17v-5.586L4.293 6.707A1 1 0 014 6V3z" clip-rule="evenodd" /></svg>
+                        <span>Filtrar</span>
+                    </button>
+                 </div>
+            </div>
+            <!-- Filtros de Status -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Filtrar por Status</label>
+                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-all" class="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Todos</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-pending" class="status-filter h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Pendentes</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-impresso" class="status-filter h-4 w-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Impressos</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-expired" class="status-filter h-4 w-4 rounded text-red-600 focus:ring-red-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Vencidos</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-extravio_motorista" class="status-filter h-4 w-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Extravio Motorista</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-extravio_base" class="status-filter h-4 w-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Extravio Base</span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumo Financeiro (com Quantidade) -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-slate-800 mb-6">Resumo do Filtro</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Valor Total dos Pedidos -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-blue-200 flex items-start space-x-4">
+                    <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.768 0-1.536.219-2.121.659L9 13.182m0 0A7.5 7.5 0 1012 5.25v.75" /></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Pedidos</h3>
+                        <p id="total-pedidos-valor" class="text-2xl font-bold text-blue-600 mt-1">R$ 0,00</p>
+                        <p id="total-pedidos-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+                <!-- Valor Total Multas (Potencial) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-amber-200 flex items-start space-x-4">
+                    <div class="bg-amber-100 rounded-full w-12 h-12 flex items-center justify-center">
+                         <svg class="h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Multas (Potencial)</h3>
+                        <p id="total-multas-potencial-valor" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</p>
+                        <p id="total-multas-potencial-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+                <!-- Valor Multas (Extravio Motorista) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-orange-200 flex items-start space-x-4">
+                    <div class="bg-orange-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <svg class="h-6 w-6 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h.008v.008h-.008v-.008zm0 0H20.625a1.125 1.125 0 001.125-1.125V14.25" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Multa (Motorista)</h3>
+                        <p id="total-multas-motorista-valor" class="text-2xl font-bold text-orange-600 mt-1">R$ 0,00</p>
+                        <p id="total-multas-motorista-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+                 <!-- Valor Multas (Extravio Base) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-teal-200 flex items-start space-x-4">
+                    <div class="bg-teal-100 rounded-full w-12 h-12 flex items-center justify-center">
+                       <svg class="h-6 w-6 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.75M9 11.25h6.75" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Multa (Base)</h3>
+                        <p id="total-multas-base-valor" class="text-2xl font-bold text-teal-600 mt-1">R$ 0,00</p>
+                        <p id="total-multas-base-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatório Detalhado -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <h2 class="text-xl font-semibold text-slate-800">Relatório Detalhado de Documentos</h2>
+                <div class="flex space-x-3 mt-4 sm:mt-0">
+                    <button id="export-excel-btn" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-md hover:bg-emerald-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM4 8h5v2H4V8z" clip-rule="evenodd" /></svg>
+                        <span>Exportar Excel</span>
+                    </button>
+                    <button id="export-pdf-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
+                        <span>Exportar PDF</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-600" id="report-table">
+                    <thead class="bg-slate-50 text-xs text-slate-700 uppercase">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Nome do Arquivo</th>
+                            <th scope="col" class="px-6 py-3">Pasta</th>
+                            <th scope="col" class="px-6 py-3">Status</th>
+                            <th scope="col" class="px-6 py-3">Valor Pedido</th>
+                            <th scope="col" class="px-6 py-3">Valor Multa</th>
+                            <th scope="col" class="px-6 py-3">Data de Envio</th>
+                            <th scope="col" class="px-6 py-3 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-table-body" class="divide-y divide-slate-200">
+                        <tr id="empty-state-report"><td colspan="7" class="text-center py-10 text-slate-500">Nenhum documento encontrado.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // -------------------------------------------------------------------------
+            // URL DO BANCO DE DADOS ONLINE - DEVE SER A MESMA DO PAINEL
+            const DATABASE_URL = "https://api.npoint.io/ef789e8a4e2cd9900cf7";
+            // -------------------------------------------------------------------------
+
+            // --- Variáveis Globais ---
+            let fullDataStore = { files: [], solvedCount: 0 }; // Armazena todos os dados
+            let filteredDataStore = []; // Armazena dados filtrados para exportação
+            let isSaving = false; // Flag para evitar conflitos de salvamento
+            
+            // --- Elementos da UI ---
+            const loadingEl = document.getElementById('initial-loading');
+            
+            // Elementos do Resumo
+            const totalPedidosValorEl = document.getElementById('total-pedidos-valor');
+            const totalPedidosQtyEl = document.getElementById('total-pedidos-qty');
+            const totalMultasPotencialValorEl = document.getElementById('total-multas-potencial-valor');
+            const totalMultasPotencialQtyEl = document.getElementById('total-multas-potencial-qty');
+            const totalMultasMotoristaValorEl = document.getElementById('total-multas-motorista-valor');
+            const totalMultasMotoristaQtyEl = document.getElementById('total-multas-motorista-qty');
+            const totalMultasBaseValorEl = document.getElementById('total-multas-base-valor');
+            const totalMultasBaseQtyEl = document.getElementById('total-multas-base-qty');
+            
+            // Elementos da Tabela
+            const reportTableBody = document.getElementById('report-table-body');
+            const emptyStateReport = document.getElementById('empty-state-report');
+
+            // Elementos de Filtro
+            const filterBtn = document.getElementById('filter-btn');
+            const filterDateStart = document.getElementById('filter-date-start');
+            const filterDateEnd = document.getElementById('filter-date-end');
+            const filterStatusAll = document.getElementById('filter-status-all');
+            const statusCheckboxes = document.querySelectorAll('.status-filter');
+
+            // Elementos de Exportação
+            const exportPdfBtn = document.getElementById('export-pdf-btn');
+            const exportExcelBtn = document.getElementById('export-excel-btn');
+
+            // Elementos de Notificação
+            const notificationEl = document.getElementById('notification');
+            const notificationMessageEl = document.getElementById('notification-message');
+
+            // --- Funções Helper ---
+            function formatCurrency(value) {
+                if (typeof value !== 'number') value = 0;
+                return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            }
+
+            let notificationTimeout;
+            function showNotification(message, isError = false) {
+                clearTimeout(notificationTimeout);
+                notificationMessageEl.textContent = message;
+                notificationEl.classList.remove('hidden', 'bg-red-500', 'bg-emerald-500');
+                notificationEl.classList.add(isError ? 'bg-red-500' : 'bg-emerald-500');
+                notificationTimeout = setTimeout(() => {
+                    notificationEl.classList.add('hidden');
+                }, 4000);
+            }
+
+            // --- Funções de Dados (GET e PUT) ---
+            async function getLatestData() {
+                try {
+                    const response = await fetch(`${DATABASE_URL}?_=${new Date().getTime()}`);
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                    const data = await response.json();
+                    if (!data.files) data.files = [];
+                    if (!data.solvedCount) data.solvedCount = 0;
+                    return data;
+                } catch (error) {
+                    console.error("Erro ao buscar dados:", error);
+                    showNotification("Não foi possível carregar os dados. Verifique sua conexão.", true);
+                    return null;
+                }
+            }
+            
+            async function saveData(dataToSave) {
+                if (isSaving) return; 
+                isSaving = true;
+                
+                try {
+                    const response = await fetch(DATABASE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dataToSave)
+                    });
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                    showNotification("Alterações salvas com sucesso!", false);
+                } catch (error) {
+                    console.error("Erro ao salvar dados:", error);
+                    showNotification("Ocorreu um erro ao salvar as alterações.", true);
+                } finally {
+                    isSaving = false; 
+                }
+            }
+
+            // --- Função Principal de Renderização e Filtro ---
+            function processAndRender() {
+                let files = fullDataStore.files;
+
+                // 1. Coletar valores dos filtros
+                const startDate = filterDateStart.valueAsNumber;
+                const endDate = filterDateEnd.valueAsNumber;
+                
+                const filterAll = filterStatusAll.checked; // "Todos" está marcado?
+                const selectedStatuses = [];
+                statusCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        selectedStatuses.push(cb.id.replace('filter-status-', ''));
+                    }
+                });
+
+                // 2. Filtrar os dados
+                const filteredFiles = files.filter(file => {
+                    const uploadDate = file.uploadDate || 0;
+                    
+                    // Checagem de Data
+                    let dateMatch = true;
+                    if (startDate && uploadDate < startDate) {
+                        dateMatch = false;
+                    }
+                    // Adiciona 1 dia ao endDate para incluir o dia todo
+                    if (endDate && uploadDate > (endDate + 86400000)) { 
+                        dateMatch = false;
+                    }
+
+                    // Checagem de Status (Nova Lógica)
+                    let statusMatch = false;
+                    if (filterAll) { // Se "Todos" está marcado, sempre corresponde
+                        statusMatch = true; 
+                    } else if (selectedStatuses.includes(file.status)) { // Senão, checa se o status está na lista
+                        statusMatch = true;
+                    }
+                    
+                    return dateMatch && statusMatch;
+                });
+
+                // Armazena dados filtrados para exportação
+                filteredDataStore = filteredFiles; 
+
+                // 3. Processar Resumo
+                let totalPedidos = 0;
+                let totalMultasPotencial = 0;
+                let totalMultasMotorista = 0;
+                let totalMultasBase = 0;
+                let qtyMotorista = 0;
+                let qtyBase = 0;
+
+                filteredFiles.forEach(file => {
+                    const valorPedido = file.valorPedido || 0;
+                    const valorMulta = file.valorMulta || 0;
+
+                    totalPedidos += valorPedido;
+                    totalMultasPotencial += valorMulta;
+
+                    if (file.status === 'extravio_motorista') {
+                        totalMultasMotorista += valorMulta;
+                        qtyMotorista++;
+                    }
+                    if (file.status === 'extravio_base') {
+                        totalMultasBase += valorMulta;
+                        qtyBase++;
+                    }
+                });
+
+                // 4. Atualizar UI do Resumo
+                totalPedidosValorEl.textContent = formatCurrency(totalPedidos);
+                totalPedidosQtyEl.textContent = `${filteredFiles.length} documento(s)`;
+                
+                totalMultasPotencialValorEl.textContent = formatCurrency(totalMultasPotencial);
+                totalMultasPotencialQtyEl.textContent = `${filteredFiles.length} documento(s)`;
+
+                totalMultasMotoristaValorEl.textContent = formatCurrency(totalMultasMotorista);
+                totalMultasMotoristaQtyEl.textContent = `${qtyMotorista} documento(s)`;
+
+                totalMultasBaseValorEl.textContent = formatCurrency(totalMultasBase);
+                totalMultasBaseQtyEl.textContent = `${qtyBase} documento(s)`;
+                
+                // 5. Renderizar Tabela
+                reportTableBody.innerHTML = ''; // Limpa a tabela
+                if (filteredFiles.length === 0) {
+                    reportTableBody.innerHTML = `<tr id="empty-state-report"><td colspan="7" class="text-center py-10 text-slate-500">Nenhum documento encontrado para este filtro.</td></tr>`;
+                } else {
+                    // Ordena por data de envio (mais recente primeiro)
+                    filteredFiles.sort((a, b) => (b.uploadDate || 0) - (a.uploadDate || 0));
+                    filteredFiles.forEach(file => {
+                        reportTableBody.insertAdjacentHTML('beforeend', createReportRow(file));
+                    });
+                }
+            }
+
+            // --- Função para criar linha do relatório (com edição) ---
+            function createReportRow(file) {
+                const uploadDateFormatted = file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D';
+                
+                let statusText = 'N/D';
+                let statusClass = 'bg-slate-100 text-slate-800';
+
+                switch(file.status) {
+                    case 'pending': statusText = 'Pendente'; statusClass = 'bg-indigo-100 text-indigo-800'; break;
+                    case 'impresso': statusText = 'Impresso'; statusClass = 'bg-sky-100 text-sky-800'; break;
+                    case 'expired': statusText = 'Vencido'; statusClass = 'bg-red-100 text-red-800'; break;
+                    case 'extravio_motorista': statusText = 'Extravio Motorista'; statusClass = 'bg-orange-100 text-orange-800'; break;
+                    case 'extravio_base': statusText = 'Extravio Base'; statusClass = 'bg-teal-100 text-teal-800'; break;
+                }
+
+                return `
+                    <tr class="bg-white hover:bg-slate-50" data-id="${file.id}">
+                        <td class="px-6 py-4 font-medium text-slate-900 whitespace-nowrap" title="${file.fileName}">${file.fileName}</td>
+                        <td class="px-6 py-4">${file.folderName || 'N/D'}</td>
+                        <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${statusText}</span></td>
+                        
+                        <!-- Coluna Valor Pedido (Editável) -->
+                        <td class="px-6 py-4">
+                            <span class="edit-span" id="valor-pedido-span-${file.id}">${formatCurrency(file.valorPedido)}</span>
+                            <input type="number" value="${file.valorPedido || 0}" id="valor-pedido-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                        </td>
+                        
+                        <!-- Coluna Valor Multa (Editável) -->
+                        <td class="px-6 py-4">
+                            <span class="edit-span" id="valor-multa-span-${file.id}">${formatCurrency(file.valorMulta)}</span>
+                            <input type="number" value="${file.valorMulta || 0}" id="valor-multa-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                        </td>
+                        
+                        <td class="px-6 py-4">${uploadDateFormatted}</td>
+                        
+                        <!-- Coluna Ações (Editar/Salvar) -->
+                        <td class="px-6 py-4 text-center">
+                            <button title="Editar Valores" class="edit-btn text-indigo-600 hover:text-indigo-800" data-id="${file.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <button title="Salvar" class="save-btn text-green-600 hover:text-green-800 hidden" data-id="${file.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </td>
+                    </tr>`;
+            }
+
+            // --- Event Listeners ---
+
+            // Listener de Filtro
+            filterBtn.addEventListener('click', processAndRender);
+
+            // REMOVIDA: Lógica de linkar checkboxes
+            // filterStatusAll.addEventListener('change', () => { ... });
+            // statusCheckboxes.forEach(cb => { ... });
+
+            // Listeners de Ações (Editar/Salvar) na Tabela
+            reportTableBody.addEventListener('click', async (event) => {
+                const editBtn = event.target.closest('.edit-btn');
+                const saveBtn = event.target.closest('.save-btn');
+
+                if (editBtn) {
+                    const fileId = editBtn.dataset.id;
+                    const row = editBtn.closest('tr');
+                    
+                    // Esconde spans, mostra inputs
+                    row.querySelectorAll('.edit-span').forEach(el => el.style.display = 'none');
+                    row.querySelectorAll('.edit-input').forEach(el => el.style.display = 'block');
+                    
+                    // Troca botões
+                    editBtn.style.display = 'none';
+                    row.querySelector('.save-btn').style.display = 'block';
+                }
+
+                if (saveBtn) {
+                    const fileId = saveBtn.dataset.id;
+                    
+                    // Pega novos valores
+                    const novoValorPedido = parseFloat(document.getElementById(`valor-pedido-input-${fileId}`).value) || 0;
+                    const novoValorMulta = parseFloat(document.getElementById(`valor-multa-input-${fileId}`).value) || 0;
+
+                    // Lógica Crítica: Fetch-Modify-Save
+                    const freshData = await getLatestData();
+                    if (!freshData) return; // Erro já notificado
+
+                    const fileIndex = freshData.files.findIndex(f => f.id === fileId);
+                    if (fileIndex > -1) {
+                        freshData.files[fileIndex].valorPedido = novoValorPedido;
+                        freshData.files[fileIndex].valorMulta = novoValorMulta;
+                    }
+
+                    await saveData(freshData); // Salva no npoint
+
+                    // Atualiza o store local e re-renderiza
+                    fullDataStore = freshData;
+                    processAndRender();
+                }
+            });
+
+            // --- Listeners de Exportação ---
+            exportExcelBtn.addEventListener('click', () => {
+                if (filteredDataStore.length === 0) {
+                    showNotification("Nenhum dado para exportar.", true);
+                    return;
+                }
+
+                // Prepara dados para Excel
+                const dataToExport = filteredDataStore.map(file => ({
+                    "Nome do Arquivo": file.fileName,
+                    "Pasta (Data Envio)": file.folderName,
+                    "Status": file.status,
+                    "Valor Pedido (R$)": file.valorPedido || 0,
+                    "Valor Multa (R$)": file.valorMulta || 0,
+                    "Data Envio": file.uploadDate ? new Date(file.uploadDate).toLocaleString('pt-BR') : 'N/D',
+                    "Prazo Final": file.deadline ? new Date(file.deadline).toLocaleString('pt-BR') : 'N/D'
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+                XLSX.writeFile(wb, "Relatorio_Acareacoes.xlsx");
+            });
+
+            exportPdfBtn.addEventListener('click', () => {
+                if (filteredDataStore.length === 0) {
+                    showNotification("Nenhum dado para exportar.", true);
+                    return;
+                }
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Prepara dados para PDF AutoTable
+                const head = [["Arquivo", "Pasta", "Status", "Valor Pedido", "Valor Multa", "Data Envio"]];
+                const body = filteredDataStore.map(file => [
+                    file.fileName,
+                    file.folderName,
+                    file.status,
+                    formatCurrency(file.valorPedido),
+                    formatCurrency(file.valorMulta),
+                    file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D'
+                ]);
+
+                doc.autoTable({
+                    head: head,
+                    body: body,
+                    styles: { fontSize: 8 },
+                    headStyles: { fillColor: [22, 160, 133] }, // Cor verde-água
+                    columnStyles: {
+                        0: { cellWidth: 70 }, // Arquivo
+                        1: { cellWidth: 20 }, // Pasta
+                        2: { cellWidth: 30 }, // Status
+                    }
+                });
+
+                doc.save("Relatorio_Acareacoes.pdf");
+            });
+
+
+            // --- Inicialização ---
+            async function initializeApp() {
+                try {
+                    const initialData = await getLatestData();
+                    if (initialData) {
+                        fullDataStore = initialData;
+                        processAndRender(); // Renderiza tudo (sem filtro)
+                    } else {
+                        showNotification("Falha ao carregar dados iniciais.", true);
+                    }
+                } catch (error) {
+                    console.error("Erro na inicialização:", error);
+                    showNotification("Erro fatal ao carregar. Tente recarregar a página.", true);
+                } finally {
+                    if (loadingEl) loadingEl.style.display = 'none'; // Sempre esconde o spinner
+                }
+            }
+            
+            initializeApp();
+        });
+    </script>
+</body>
+</html>
+
