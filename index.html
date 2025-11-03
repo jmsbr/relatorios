@@ -53,6 +53,12 @@
                 <p class="text-slate-600 mt-1">Filtre, edite e exporte os dados financeiros.</p>
             </div>
             <div class="flex items-center space-x-4 md:space-x-6 mt-4 sm:mt-0">
+                <!-- NOVO BOTÃO ATUALIZAR -->
+                <button id="refresh-btn" class="p-2 bg-white rounded-md shadow-sm border border-slate-200 text-slate-600 hover:bg-slate-50" title="Atualizar Dados">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.004 12.09A7.002 7.002 0 0114.001 9.5a1 1 0 111.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.885-.666A5.002 5.002 0 005.999 17H9a1 1 0 110-2H4.004v-1.001z" clip-rule="evenodd" />
+                    </svg>
+                </button>
                 <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo J&T Express" class="h-16 w-auto" onerror="this.style.display='none'">
             </div>
         </header>
@@ -105,30 +111,33 @@
         <!-- Resumo Financeiro (com Quantidade) -->
         <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
             <h2 class="text-xl font-semibold text-slate-800 mb-6">Resumo do Filtro</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                <!-- Valor Total dos Pedidos -->
+            <!-- Grid ajustado para 5 colunas em telas grandes -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <!-- Valor Total dos Pedidos (S/ Multa) -->
                 <div class="bg-white p-6 rounded-lg shadow-sm border border-blue-200 flex items-start space-x-4">
                     <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center">
                         <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.768 0-1.536.219-2.121.659L9 13.182m0 0A7.5 7.5 0 1012 5.25v.75" /></svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Pedidos</h3>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Valor Pedidos (S/ Multa)</h3>
                         <p id="total-pedidos-valor" class="text-2xl font-bold text-blue-600 mt-1">R$ 0,00</p>
                         <p id="total-pedidos-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
                     </div>
                 </div>
-                <!-- Valor Total Multas (Potencial) -->
+                <!-- Valor Total Multas (Aplicadas) -->
                 <div class="bg-white p-6 rounded-lg shadow-sm border border-amber-200 flex items-start space-x-4">
                     <div class="bg-amber-100 rounded-full w-12 h-12 flex items-center justify-center">
                          <svg class="h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Multas (Potencial)</h3>
-                        <p id="total-multas-potencial-valor" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</p>
-                        <p id="total-multas-potencial-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                        <!-- Título Atualizado -->
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total de Multas (Extravios)</h3>
+                        <p id="total-multas-aplicadas-valor" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</p>
+                        <p id="total-multas-aplicadas-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
                     </div>
                 </div>
-                <!-- Valor Multas (Extravio Motorista) -->
+                
+                <!-- Total Extravio Motorista (ADICIONADO DE VOLTA) -->
                 <div class="bg-white p-6 rounded-lg shadow-sm border border-orange-200 flex items-start space-x-4">
                     <div class="bg-orange-100 rounded-full w-12 h-12 flex items-center justify-center">
                         <svg class="h-6 w-6 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -136,12 +145,18 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Multa (Motorista)</h3>
-                        <p id="total-multas-motorista-valor" class="text-2xl font-bold text-orange-600 mt-1">R$ 0,00</p>
-                        <p id="total-multas-motorista-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Extrav. Motorista</h3>
+                        <!-- Pedidos (Sem Multa) -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Pedidos (S/ Multa):</p>
+                        <p id="total-pedidos-motorista-valor" class="text-lg font-bold text-orange-600">R$ 0,00</p>
+                        <!-- Multas -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Multas:</p>
+                        <p id="total-multas-motorista-valor" class="text-lg font-bold text-orange-600">R$ 0,00</p>
+                        <!-- Quantidade -->
+                        <p id="total-multas-motorista-qty" class="text-sm font-medium text-slate-500 mt-2">0 documentos</p>
                     </div>
                 </div>
-                 <!-- Valor Multas (Extravio Base) -->
+                 <!-- Total Extravio Base (ADICIONADO DE VOLTA) -->
                 <div class="bg-white p-6 rounded-lg shadow-sm border border-teal-200 flex items-start space-x-4">
                     <div class="bg-teal-100 rounded-full w-12 h-12 flex items-center justify-center">
                        <svg class="h-6 w-6 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -149,12 +164,19 @@
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Multa (Base)</h3>
-                        <p id="total-multas-base-valor" class="text-2xl font-bold text-teal-600 mt-1">R$ 0,00</p>
-                        <p id="total-multas-base-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Extrav. Base</h3>
+                        <!-- Pedidos (Sem Multa) -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Pedidos (S/ Multa):</p>
+                        <p id="total-pedidos-base-valor" class="text-lg font-bold text-teal-600">R$ 0,00</p>
+                        <!-- Multas -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Multas:</p>
+                        <p id="total-multas-base-valor" class="text-lg font-bold text-teal-600">R$ 0,00</p>
+                        <!-- Quantidade -->
+                        <p id="total-multas-base-qty" class="text-sm font-medium text-slate-500 mt-2">0 documentos</p>
                     </div>
                 </div>
-                <!-- NOVO CARD: Valor Total (Pedidos + Multas) -->
+
+                <!-- Valor Total Geral (Pedidos + Multas Aplicadas) -->
                 <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-300 flex items-start space-x-4">
                     <div class="bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center">
                        <svg class="h-6 w-6 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -162,7 +184,8 @@
                        </svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total (Pedidos+Multas)</h3>
+                        <!-- Título Atualizado -->
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Valor Total Geral (c/ Multas)</h3>
                         <p id="total-geral-valor" class="text-2xl font-bold text-slate-600 mt-1">R$ 0,00</p>
                         <p id="total-geral-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
                     </div>
@@ -195,14 +218,15 @@
                             <th scope="col" class="px-6 py-3">Motorista</th>
                             <th scope="col" class="px-6 py-3">Pasta</th>
                             <th scope="col" class="px-6 py-3">Status</th>
-                            <th scope="col" class="px-6 py-3">Valor Pedido</th>
+                            <th scope="col" class="px-6 py-3">Valor Pedido (S/ Multa)</th>
                             <th scope="col" class="px-6 py-3">Valor Multa</th>
+                            <th scope="col" class="px-6 py-3">Valor Total (C/ Multa)</th>
                             <th scope="col" class="px-6 py-3">Data de Envio</th>
                             <th scope="col" class="px-6 py-3 text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="report-table-body" class="divide-y divide-slate-200">
-                        <tr id="empty-state-report"><td colspan="9" class="text-center py-10 text-slate-500">Nenhum documento encontrado.</td></tr>
+                        <tr id="empty-state-report"><td colspan="10" class="text-center py-10 text-slate-500">Nenhum documento encontrado.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -229,12 +253,18 @@
             // Elementos do Resumo
             const totalPedidosValorEl = document.getElementById('total-pedidos-valor');
             const totalPedidosQtyEl = document.getElementById('total-pedidos-qty');
-            const totalMultasPotencialValorEl = document.getElementById('total-multas-potencial-valor');
-            const totalMultasPotencialQtyEl = document.getElementById('total-multas-potencial-qty');
+            // IDs atualizados
+            const totalMultasAplicadasValorEl = document.getElementById('total-multas-aplicadas-valor');
+            const totalMultasAplicadasQtyEl = document.getElementById('total-multas-aplicadas-qty');
+            // IDs dos cards adicionados de volta
             const totalMultasMotoristaValorEl = document.getElementById('total-multas-motorista-valor');
             const totalMultasMotoristaQtyEl = document.getElementById('total-multas-motorista-qty');
             const totalMultasBaseValorEl = document.getElementById('total-multas-base-valor');
             const totalMultasBaseQtyEl = document.getElementById('total-multas-base-qty');
+            // IDs para os novos campos de Pedidos (S/ Multa) nos cards de extravio
+            const totalPedidosMotoristaValorEl = document.getElementById('total-pedidos-motorista-valor');
+            const totalPedidosBaseValorEl = document.getElementById('total-pedidos-base-valor');
+
             const totalGeralValorEl = document.getElementById('total-geral-valor');
             const totalGeralQtyEl = document.getElementById('total-geral-qty');
             
@@ -244,6 +274,7 @@
 
             // Elementos de Filtro
             const filterBtn = document.getElementById('filter-btn');
+            const refreshBtn = document.getElementById('refresh-btn'); // NOVO
             const filterDateStart = document.getElementById('filter-date-start');
             const filterDateEnd = document.getElementById('filter-date-end');
             const filterStatusAll = document.getElementById('filter-status-all');
@@ -412,51 +443,64 @@
 
                 // 3. Processar Resumo
                 let totalPedidos = 0;
-                let totalMultasPotencial = 0;
+                let totalMultasPotencial = 0; // Este não é mais usado nos cards, mas ainda é calculado
                 let totalMultasMotorista = 0;
                 let totalMultasBase = 0;
                 let qtyMotorista = 0;
                 let qtyBase = 0;
+                // Novas variáveis para os pedidos de extravio
+                let totalPedidosMotorista = 0;
+                let totalPedidosBase = 0;
 
                 filteredFiles.forEach(file => {
                     const valorPedido = file.valorPedido || 0;
                     const valorMulta = file.valorMulta || 0;
 
                     totalPedidos += valorPedido;
-                    totalMultasPotencial += valorMulta;
+                    totalMultasPotencial += valorMulta; // Mantido para cálculo geral se necessário, mas não exibido
 
                     if (file.status === 'extravio_motorista') {
                         totalMultasMotorista += valorMulta;
+                        totalPedidosMotorista += valorPedido; // Adiciona o valor do pedido
                         qtyMotorista++;
                     }
                     if (file.status === 'extravio_base') {
                         totalMultasBase += valorMulta;
+                        totalPedidosBase += valorPedido; // Adiciona o valor do pedido
                         qtyBase++;
                     }
                 });
+
+                // (NOVA LÓGICA DE CÁLCULO)
+                const totalMultasAplicadas = totalMultasMotorista + totalMultasBase;
+                const totalGeral = totalPedidos + totalMultasAplicadas;
 
                 // 4. Atualizar UI do Resumo
                 totalPedidosValorEl.textContent = formatCurrency(totalPedidos);
                 totalPedidosQtyEl.textContent = `${filteredFiles.length} documento(s)`;
                 
-                totalMultasPotencialValorEl.textContent = formatCurrency(totalMultasPotencial);
-                totalMultasPotencialQtyEl.textContent = `${filteredFiles.length} documento(s)`;
+                // Atualiza card "Multas Aplicadas"
+                totalMultasAplicadasValorEl.textContent = formatCurrency(totalMultasAplicadas);
+                totalMultasAplicadasQtyEl.textContent = `${qtyMotorista + qtyBase} documento(s)`;
 
+                // Atualiza card "Extravio Motorista" (ADICIONADO DE VOLTA)
+                totalPedidosMotoristaValorEl.textContent = formatCurrency(totalPedidosMotorista); // Novo
                 totalMultasMotoristaValorEl.textContent = formatCurrency(totalMultasMotorista);
                 totalMultasMotoristaQtyEl.textContent = `${qtyMotorista} documento(s)`;
 
+                // Atualiza card "Extravio Base" (ADICIONADO DE VOLTA)
+                totalPedidosBaseValorEl.textContent = formatCurrency(totalPedidosBase); // Novo
                 totalMultasBaseValorEl.textContent = formatCurrency(totalMultasBase);
                 totalMultasBaseQtyEl.textContent = `${qtyBase} documento(s)`;
 
-                // Novo Resumo Total
-                const totalGeral = totalPedidos + totalMultasPotencial;
+                // Atualiza "Valor Geral"
                 totalGeralValorEl.textContent = formatCurrency(totalGeral);
                 totalGeralQtyEl.textContent = `${filteredFiles.length} documento(s)`;
                 
                 // 5. Renderizar Tabela
                 reportTableBody.innerHTML = ''; // Limpa a tabela
                 if (filteredFiles.length === 0) {
-                    reportTableBody.innerHTML = `<tr id="empty-state-report"><td colspan="9" class="text-center py-10 text-slate-500">Nenhum documento encontrado para este filtro.</td></tr>`;
+                    reportTableBody.innerHTML = `<tr id="empty-state-report"><td colspan="10" class="text-center py-10 text-slate-500">Nenhum documento encontrado para este filtro.</td></tr>`;
                 } else {
                     // Ordena por data de envio (mais recente primeiro)
                     filteredFiles.sort((a, b) => (b.uploadDate || 0) - (a.uploadDate || 0));
@@ -471,6 +515,9 @@
                 const uploadDateFormatted = file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D';
                 const pedidoNum = extractPedidoNum(file.fileName);
                 const motoristaName = extractMotorista(file.fileName); // NOVO
+                const valorPedido = file.valorPedido || 0;
+                const valorMulta = file.valorMulta || 0;
+                const valorTotal = valorPedido + valorMulta; // NOVO CÁLCULO
                 
                 let statusText = 'N/D';
                 let statusClass = 'bg-slate-100 text-slate-800';
@@ -493,14 +540,19 @@
                         
                         <!-- Coluna Valor Pedido (Editável) -->
                         <td class="px-6 py-4">
-                            <span class="edit-span" id="valor-pedido-span-${file.id}">${formatCurrency(file.valorPedido)}</span>
-                            <input type="number" value="${file.valorPedido || 0}" id="valor-pedido-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                            <span class="edit-span" id="valor-pedido-span-${file.id}">${formatCurrency(valorPedido)}</span>
+                            <input type="number" value="${valorPedido}" id="valor-pedido-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
                         </td>
                         
                         <!-- Coluna Valor Multa (Editável) -->
                         <td class="px-6 py-4">
-                            <span class="edit-span" id="valor-multa-span-${file.id}">${formatCurrency(file.valorMulta)}</span>
-                            <input type="number" value="${file.valorMulta || 0}" id="valor-multa-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                            <span class="edit-span" id="valor-multa-span-${file.id}">${formatCurrency(valorMulta)}</span>
+                            <input type="number" value="${valorMulta}" id="valor-multa-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                        </td>
+                        
+                        <!-- NOVA COLUNA VALOR TOTAL -->
+                        <td class="px-6 py-4 font-medium text-slate-700">
+                            ${formatCurrency(valorTotal)}
                         </td>
                         
                         <td class="px-6 py-4">${uploadDateFormatted}</td>
@@ -524,6 +576,13 @@
             // Adiciona listeners para filtrar ao digitar "Enter"
             filterPedido.addEventListener('keypress', (e) => e.key === 'Enter' && processAndRender());
             filterMotorista.addEventListener('keypress', (e) => e.key === 'Enter' && processAndRender());
+
+            // (NOVO) Listener do Botão Atualizar
+            refreshBtn.addEventListener('click', () => {
+                if (loadingEl) loadingEl.style.display = 'flex'; // Mostra o spinner
+                showNotification("Buscando dados atualizados...", false);
+                initializeApp(); // Re-executa a função principal
+            });
 
 
             // Listeners de Ações (Editar/Salvar) na Tabela
@@ -583,8 +642,9 @@
                     "Motorista": extractMotorista(file.fileName),
                     "Pasta (Data Envio)": file.folderName,
                     "Status": file.status,
-                    "Valor Pedido (R$)": file.valorPedido || 0,
+                    "Valor Pedido (S/ Multa) (R$)": file.valorPedido || 0,
                     "Valor Multa (R$)": file.valorMulta || 0,
+                    "Valor Total (C/ Multa) (R$)": (file.valorPedido || 0) + (file.valorMulta || 0),
                     "Data Envio": file.uploadDate ? new Date(file.uploadDate).toLocaleString('pt-BR') : 'N/D',
                     "Prazo Final": file.deadline ? new Date(file.deadline).toLocaleString('pt-BR') : 'N/D'
                 }));
@@ -605,32 +665,38 @@
                 const doc = new jsPDF({ orientation: 'landscape' }); // Deixa o PDF mais largo
 
                 // Prepara dados para PDF AutoTable
-                const head = [["Arquivo", "Nº Pedido", "Motorista", "Pasta", "Status", "Valor Pedido", "Valor Multa", "Data Envio"]];
-                const body = filteredDataStore.map(file => [
-                    file.fileName,
-                    extractPedidoNum(file.fileName),
-                    extractMotorista(file.fileName),
-                    file.folderName,
-                    file.status,
-                    formatCurrency(file.valorPedido),
-                    formatCurrency(file.valorMulta),
-                    file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D'
-                ]);
+                const head = [["Arquivo", "Nº Pedido", "Motorista", "Pasta", "Status", "V. Pedido (S/ M)", "V. Multa", "V. Total (C/ M)", "Data Envio"]];
+                const body = filteredDataStore.map(file => {
+                    const valorPedido = file.valorPedido || 0;
+                    const valorMulta = file.valorMulta || 0;
+                    return [
+                        file.fileName,
+                        extractPedidoNum(file.fileName),
+                        extractMotorista(file.fileName),
+                        file.folderName,
+                        file.status,
+                        formatCurrency(valorPedido),
+                        formatCurrency(valorMulta),
+                        formatCurrency(valorPedido + valorMulta),
+                        file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D'
+                    ];
+                });
 
                 doc.autoTable({
                     head: head,
                     body: body,
-                    styles: { fontSize: 7, cellPadding: 1.5 }, // Diminui a fonte e o padding
+                    styles: { fontSize: 6, cellPadding: 1.5 }, // Diminui a fonte
                     headStyles: { fillColor: [22, 160, 133] }, // Cor verde-água
                     columnStyles: {
-                        0: { cellWidth: 55 }, // Arquivo
-                        1: { cellWidth: 25 }, // Nº Pedido
-                        2: { cellWidth: 35 }, // Motorista
+                        0: { cellWidth: 50 }, // Arquivo
+                        1: { cellWidth: 22 }, // Nº Pedido
+                        2: { cellWidth: 30 }, // Motorista
                         3: { cellWidth: 15 }, // Pasta
                         4: { cellWidth: 25 }, // Status
-                        5: { cellWidth: 22 }, // Valor Pedido
-                        6: { cellWidth: 22 }, // Valor Multa
-                        7: { cellWidth: 20 }, // Data Envio
+                        5: { cellWidth: 20 }, // V. Pedido
+                        6: { cellWidth: 20 }, // V. Multa
+                        7: { cellWidth: 22 }, // V. Total
+                        8: { cellWidth: 20 }, // Data Envio
                     }
                 });
 
@@ -661,4 +727,10 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
 
