@@ -1,485 +1,729 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Relatórios</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Bibliotecas de Exportação -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        #initial-loading {
-            position: fixed; inset: 0; background-color: rgba(248, 250, 252, 0.98);
-            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
-        }
-        .edit-input { display: none; }
-        .row-saving { background-color: #f1f5f9; opacity: 0.7; }
-        
-        /* Indicador de Sincronização */
-        .sync-status { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-        .status-synced { background-color: #dcfce7; color: #166534; }
-        .status-pending { background-color: #fef9c3; color: #854d0e; animation: pulse 2s infinite; }
-        
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Relatórios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bibliotecas de Exportação -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* bg-slate-50 */
+        }
+        /* Estilo para o spinner de carregamento inicial */
+        #initial-loading {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(248, 250, 252, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        /* Esconde inputs de edição por padrão */
+        .edit-input { display: none; }
+    </style>
 </head>
 <body class="bg-slate-50">
 
-    <!-- Carregamento Inicial -->
-    <div id="initial-loading">
-        <div class="relative flex items-center justify-center">
-            <div class="absolute w-16 h-16 border-4 border-indigo-100 rounded-full"></div>
-            <div class="absolute w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-        </div>
-        <p class="mt-8 text-slate-600 font-bold uppercase tracking-widest text-xs">A Sincronizar Ficheiros...</p>
-    </div>
+    <!-- Loading Inicial -->
+    <div id="initial-loading">
+        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="mt-4 text-slate-600">Carregando relatórios...</p>
+    </div>
 
-    <!-- Notificações -->
-    <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 max-w-sm">
-        <p id="notification-message" class="text-sm font-bold"></p>
-    </div>
+    <!-- Elemento de Notificação -->
+    <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-md shadow-lg text-white transition-opacity duration-300 max-w-sm">
+        <p id="notification-message"></p>
+    </div>
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
-        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-            <div>
-                <div class="flex items-center space-x-3">
-                    <h1 class="text-3xl font-black text-slate-800 tracking-tighter">Portal de Relatórios</h1>
-                    <div id="sync-indicator" class="sync-status status-synced">
-                        <span id="sync-text">Sincronizado</span>
-                    </div>
-                </div>
-                <p class="text-slate-500 mt-1 font-medium">Gestão Financeira e Operacional J&T Express</p>
-            </div>
-            <div class="flex items-center space-x-4 mt-4 sm:mt-0">
-                <button id="refresh-btn" class="p-2.5 bg-white rounded-xl shadow-sm border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all active:scale-95" title="Atualizar Dados">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                </button>
-                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logótipo J&T" class="h-12 w-auto opacity-90">
-            </div>
-        </header>
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">Portal de Relatórios</h1>
+                <p class="text-slate-600 mt-1">Filtre, edite e exporte os dados financeiros.</p>
+            </div>
+            <div class="flex items-center space-x-4 md:space-x-6 mt-4 sm:mt-0">
+                <!-- NOVO BOTÃO ATUALIZAR -->
+                <button id="refresh-btn" class="p-2 bg-white rounded-md shadow-sm border border-slate-200 text-slate-600 hover:bg-slate-50" title="Atualizar Dados">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.004 12.09A7.002 7.002 0 0114.001 9.5a1 1 0 111.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.885-.666A5.002 5.002 0 005.999 17H9a1 1 0 110-2H4.004v-1.001z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo J&T Express" class="h-16 w-auto" onerror="this.style.display='none'">
+            </div>
+        </header>
 
-        <!-- Filtros -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Início do Período</label>
-                    <input type="date" id="filter-date-start" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Fim do Período</label>
-                    <input type="date" id="filter-date-end" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Número do Pedido</label>
-                    <input type="text" id="filter-pedido" placeholder="Ex: 123..." class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nome do Condutor</label>
-                    <input type="text" id="filter-motorista" placeholder="Procurar condutor..." class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                </div>
-            </div>
-            
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-6 border-t border-slate-50">
-                <div class="flex flex-wrap gap-2">
-                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-all" class="w-4 h-4 rounded text-indigo-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase">Todos</span>
-                    </label>
-                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-pending" class="status-filter w-4 h-4 rounded text-indigo-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase">Pendentes</span>
-                    </label>
-                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-impresso" class="status-filter w-4 h-4 rounded text-sky-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase text-sky-600">Impressos</span>
-                    </label>
-                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-extravio_motorista" class="status-filter w-4 h-4 rounded text-orange-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase text-orange-600">Ext. Condutor</span>
-                    </label>
-                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-extravio_base" class="status-filter w-4 h-4 rounded text-teal-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase text-teal-600">Ext. Base</span>
-                    </label>
-                </div>
-                <button id="filter-btn" class="bg-slate-800 text-white font-black py-3 px-12 rounded-xl hover:bg-slate-900 transition-all text-xs uppercase tracking-widest shadow-lg shadow-slate-200">
-                    Filtrar Dados
-                </button>
-            </div>
-        </div>
+        <!-- Filtros -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-slate-800 mb-4">Filtros de Relatório</h2>
+            <!-- Filtros de Data e Botão -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label for="filter-date-start" class="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
+                    <input type="date" id="filter-date-start" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="filter-date-end" class="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
+                    <input type="date" id="filter-date-end" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                 <div class="flex items-end">
+                    <button id="filter-btn" class="w-full md:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 flex items-center justify-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L13 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 019 17v-5.586L4.293 6.707A1 1 0 014 6V3z" clip-rule="evenodd" /></svg>
+                        <span>Filtrar</span>
+                    </button>
+                 </div>
+            </div>
+            <!-- (NOVO) Filtros de Texto -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div>
+                    <label for="filter-pedido" class="block text-sm font-medium text-slate-700 mb-1">Filtrar por Nº Pedido</label>
+                    <input type="text" id="filter-pedido" placeholder="Digite o número do pedido" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="filter-motorista" class="block text-sm font-medium text-slate-700 mb-1">Filtrar por Motorista</label>
+                    <input type="text" id="filter-motorista" placeholder="Digite o nome do motorista" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+            </div>
+            <!-- Filtros de Status -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-slate-700 mb-2">Filtrar por Status</label>
+                <div class="flex flex-wrap gap-x-6 gap-y-2">
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-all" class="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Todos</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-pending" class="status-filter h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Pendentes</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-impresso" class="status-filter h-4 w-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Impressos</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-expired" class="status-filter h-4 w-4 rounded text-red-600 focus:ring-red-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Vencidos</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-extravio_motorista" class="status-filter h-4 w-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Extravio Motorista</span></label>
+                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-extravio_base" class="status-filter h-4 w-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Extravio Base</span></label>
+                </div>
+            </div>
+        </div>
 
-        <!-- Resumo Financeiro -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 class="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Valor Pedidos (S/M)</h3>
-                <p id="total-pedidos-valor" class="text-2xl font-black text-slate-800 tracking-tighter">€ 0,00</p>
-                <p id="total-pedidos-qty" class="text-[10px] text-slate-400 mt-1 font-bold italic">0 documentos</p>
-            </div>
+        <!-- Resumo Financeiro (com Quantidade) -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
+            <h2 class="text-xl font-semibold text-slate-800 mb-6">Resumo do Filtro</h2>
+            <!-- Grid ajustado para 5 colunas em telas grandes -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <!-- Valor Total dos Pedidos (S/ Multa) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-blue-200 flex items-start space-x-4">
+                    <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.768 0-1.536.219-2.121.659L9 13.182m0 0A7.5 7.5 0 1012 5.25v.75" /></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Valor Pedidos (S/ Multa)</h3>
+                        <p id="total-pedidos-valor" class="text-2xl font-bold text-blue-600 mt-1">R$ 0,00</p>
+                        <p id="total-pedidos-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+                <!-- Valor Total Multas (Aplicadas) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-amber-200 flex items-start space-x-4">
+                    <div class="bg-amber-100 rounded-full w-12 h-12 flex items-center justify-center">
+                         <svg class="h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg>
+                    </div>
+                    <div>
+                        <!-- Título Atualizado -->
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total de Multas (Extravios)</h3>
+                        <p id="total-multas-aplicadas-valor" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</p>
+                        <p id="total-multas-aplicadas-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+                
+                <!-- Total Extravio Motorista (ADICIONADO DE VOLTA) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-orange-200 flex items-start space-x-4">
+                    <div class="bg-orange-100 rounded-full w-12 h-12 flex items-center justify-center">
+                        <svg class="h-6 w-6 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h.008v.008h-.008v-.008zm0 0H20.625a1.125 1.125 0 001.125-1.125V14.25" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Extrav. Motorista</h3>
+                        <!-- Pedidos (Sem Multa) -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Pedidos (S/ Multa):</p>
+                        <p id="total-pedidos-motorista-valor" class="text-lg font-bold text-orange-600">R$ 0,00</p>
+                        <!-- Multas -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Multas:</p>
+                        <p id="total-multas-motorista-valor" class="text-lg font-bold text-orange-600">R$ 0,00</p>
+                        <!-- Quantidade -->
+                        <p id="total-multas-motorista-qty" class="text-sm font-medium text-slate-500 mt-2">0 documentos</p>
+                    </div>
+                </div>
+                 <!-- Total Extravio Base (ADICIONADO DE VOLTA) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-teal-200 flex items-start space-x-4">
+                    <div class="bg-teal-100 rounded-full w-12 h-12 flex items-center justify-center">
+                       <svg class="h-6 w-6 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.75M9 11.25h6.75" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Extrav. Base</h3>
+                        <!-- Pedidos (Sem Multa) -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Pedidos (S/ Multa):</p>
+                        <p id="total-pedidos-base-valor" class="text-lg font-bold text-teal-600">R$ 0,00</p>
+                        <!-- Multas -->
+                        <p class="text-sm font-medium text-slate-500 mt-1">Multas:</p>
+                        <p id="total-multas-base-valor" class="text-lg font-bold text-teal-600">R$ 0,00</p>
+                        <!-- Quantidade -->
+                        <p id="total-multas-base-qty" class="text-sm font-medium text-slate-500 mt-2">0 documentos</p>
+                    </div>
+                </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">Total de Multas</h3>
-                <p id="total-multas-aplicadas-valor" class="text-2xl font-black text-slate-800 tracking-tighter">€ 0,00</p>
-                <p id="total-multas-aplicadas-qty" class="text-[10px] text-slate-400 mt-1 font-bold italic">0 documentos</p>
-            </div>
+                <!-- Valor Total Geral (Pedidos + Multas Aplicadas) -->
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-300 flex items-start space-x-4">
+                    <div class="bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center">
+                       <svg class="h-6 w-6 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8.25v-1.875A3.375 3.375 0 008.625 3H5.25A3.375 3.375 0 001.875 6.375v11.25A3.375 3.375 0 005.25 21h13.5A3.375 3.375 0 0022.125 17.625V10.5A3.375 3.375 0 0018.75 7.125h-3.375A3.375 3.375 0 0012 3.75v4.5zM12 8.25h1.875a3.375 3.375 0 013.375 3.375v11.25A3.375 3.375 0 0113.5 21h-3A3.375 3.375 0 017.125 17.625V11.625a3.375 3.375 0 013.375-3.375H12z" />
+                       </svg>
+                    </div>
+                    <div>
+                        <!-- Título Atualizado -->
+                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Valor Total Geral (c/ Multas)</h3>
+                        <p id="total-geral-valor" class="text-2xl font-bold text-slate-600 mt-1">R$ 0,00</p>
+                        <p id="total-geral-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-orange-400">
-                <h3 class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Ext. Condutor</h3>
-                <p id="total-multas-motorista-valor" class="text-xl font-black text-slate-800">€ 0,00</p>
-                <p id="total-multas-motorista-qty" class="text-[10px] text-slate-400 font-bold mt-1 uppercase">0 documentos</p>
-            </div>
+        <!-- Relatório Detalhado -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <h2 class="text-xl font-semibold text-slate-800">Relatório Detalhado de Documentos</h2>
+                <div class="flex space-x-3 mt-4 sm:mt-0">
+                    <button id="export-excel-btn" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-md hover:bg-emerald-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM4 8h5v2H4V8z" clip-rule="evenodd" /></svg>
+                        <span>Exportar Excel</span>
+                    </button>
+                    <button id="export-pdf-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
+                        <span>Exportar PDF</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-600" id="report-table">
+                    <thead class="bg-slate-50 text-xs text-slate-700 uppercase">
+                        <tr>
+                            <th scope="col" class="px-6 py-3">Nome do Arquivo</th>
+                            <th scope="col" class="px-6 py-3">Nº Pedido</th>
+                            <th scope="col" class="px-6 py-3">Motorista</th>
+                            <th scope="col" class="px-6 py-3">Pasta</th>
+                            <th scope="col" class="px-6 py-3">Status</th>
+                            <th scope="col" class="px-6 py-3">Valor Pedido (S/ Multa)</th>
+                            <th scope="col" class="px-6 py-3">Valor Multa</th>
+                            <th scope="col" class="px-6 py-3">Valor Total (C/ Multa)</th>
+                            <th scope="col" class="px-6 py-3">Data de Envio</th>
+                            <th scope="col" class="px-6 py-3 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-table-body" class="divide-y divide-slate-200">
+                        <tr id="empty-state-report"><td colspan="10" class="text-center py-10 text-slate-500">Nenhum documento encontrado.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-teal-400">
-                <h3 class="text-[10px] font-black text-teal-500 uppercase tracking-widest mb-1">Ext. Base</h3>
-                <p id="total-multas-base-valor" class="text-xl font-black text-slate-800">€ 0,00</p>
-                <p id="total-multas-base-qty" class="text-[10px] text-slate-400 font-bold mt-1 uppercase">0 documentos</p>
-            </div>
+    </div>
 
-            <div class="bg-indigo-600 p-5 rounded-2xl shadow-xl shadow-indigo-100 text-white">
-                <h3 class="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-2 text-center">Valor Total Geral</h3>
-                <p id="total-geral-valor" class="text-2xl font-black text-center tracking-tighter">€ 0,00</p>
-                <p class="text-[8px] text-indigo-300 text-center uppercase font-black mt-2 tracking-tighter">Faturamento + Multas</p>
-            </div>
-        </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // -------------------------------------------------------------------------
+            // URL DO BANCO DE DADOS ONLINE - DEVE SER A MESMA DO PAINEL
+            const DATABASE_URL = "https://api.npoint.io/ef789e8a4e2cd9900cf7";
+            // -------------------------------------------------------------------------
 
-        <!-- Tabela -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-            <div class="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-                <h2 class="font-black text-slate-400 text-[10px] uppercase tracking-widest">Base de Dados de Ficheiros</h2>
-                <div class="flex space-x-2">
-                    <button id="export-excel-btn" class="bg-emerald-50 text-emerald-700 text-[10px] font-black py-2 px-5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest">Exportar Excel</button>
-                    <button id="export-pdf-btn" class="bg-red-50 text-red-700 text-[10px] font-black py-2 px-5 rounded-lg border border-red-100 hover:bg-red-100 transition-all uppercase tracking-widest">Gerar PDF</button>
-                </div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left text-slate-600" id="report-table">
-                    <thead class="bg-slate-50/80 text-[10px] text-slate-400 uppercase font-black border-b border-slate-100">
-                        <tr>
-                            <th class="px-6 py-4">Ficheiro</th>
-                            <th class="px-6 py-4">Pedido</th>
-                            <th class="px-6 py-4">Condutor</th>
-                            <th class="px-6 py-4">Estado</th>
-                            <th class="px-6 py-4 text-right">V. Pedido</th>
-                            <th class="px-6 py-4 text-right">V. Multa</th>
-                            <th class="px-6 py-4 text-right">Total</th>
-                            <th class="px-6 py-4 text-center">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="report-table-body" class="divide-y divide-slate-50">
-                        <tr id="empty-state-report"><td colspan="8" class="text-center py-24 text-slate-300 font-bold uppercase text-[10px] tracking-widest animate-pulse">Sincronizando com o npoint...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+            // --- Variáveis Globais ---
+            let fullDataStore = { files: [], solvedCount: 0 }; // Armazena todos os dados
+            let filteredDataStore = []; // Armazena dados filtrados para exportação
+            let isSaving = false; // Flag para evitar conflitos de salvamento
+            
+            // --- Elementos da UI ---
+            const loadingEl = document.getElementById('initial-loading');
+            
+            // Elementos do Resumo
+            const totalPedidosValorEl = document.getElementById('total-pedidos-valor');
+            const totalPedidosQtyEl = document.getElementById('total-pedidos-qty');
+            // IDs atualizados
+            const totalMultasAplicadasValorEl = document.getElementById('total-multas-aplicadas-valor');
+            const totalMultasAplicadasQtyEl = document.getElementById('total-multas-aplicadas-qty');
+            // IDs dos cards adicionados de volta
+            const totalMultasMotoristaValorEl = document.getElementById('total-multas-motorista-valor');
+            const totalMultasMotoristaQtyEl = document.getElementById('total-multas-motorista-qty');
+            const totalMultasBaseValorEl = document.getElementById('total-multas-base-valor');
+            const totalMultasBaseQtyEl = document.getElementById('total-multas-base-qty');
+            // IDs para os novos campos de Pedidos (S/ Multa) nos cards de extravio
+            const totalPedidosMotoristaValorEl = document.getElementById('total-pedidos-motorista-valor');
+            const totalPedidosBaseValorEl = document.getElementById('total-pedidos-base-valor');
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const DATABASE_URL = "https://api.npoint.io/ef789e8a4e2cd9900cf7";
-            const CACHE_KEY = "portal_relatorios_data";
-            
-            const UI = {
-                tableBody: document.getElementById('report-table-body'),
-                loading: document.getElementById('initial-loading'),
-                notify: document.getElementById('notification'),
-                notifyMsg: document.getElementById('notification-message'),
-                totalPedVal: document.getElementById('total-pedidos-valor'),
-                totalPedQty: document.getElementById('total-pedidos-qty'),
-                totalMultasVal: document.getElementById('total-multas-aplicadas-valor'),
-                totalMultasQty: document.getElementById('total-multas-aplicadas-qty'),
-                totalMotVal: document.getElementById('total-multas-motorista-valor'),
-                totalMotQty: document.getElementById('total-multas-motorista-qty'),
-                totalBaseVal: document.getElementById('total-multas-base-valor'),
-                totalBaseQty: document.getElementById('total-multas-base-qty'),
-                totalGeralVal: document.getElementById('total-geral-valor'),
-                syncIndicator: document.getElementById('sync-indicator'),
-                syncText: document.getElementById('sync-text')
-            };
+            const totalGeralValorEl = document.getElementById('total-geral-valor');
+            const totalGeralQtyEl = document.getElementById('total-geral-qty');
+            
+            // Elementos da Tabela
+            const reportTableBody = document.getElementById('report-table-body');
+            const emptyStateReport = document.getElementById('empty-state-report');
 
-            let fullDataStore = { files: [] };
-            let filteredDataStore = [];
-            let syncTimeout = null;
+            // Elementos de Filtro
+            const filterBtn = document.getElementById('filter-btn');
+            const refreshBtn = document.getElementById('refresh-btn'); // NOVO
+            const filterDateStart = document.getElementById('filter-date-start');
+            const filterDateEnd = document.getElementById('filter-date-end');
+            const filterStatusAll = document.getElementById('filter-status-all');
+            const statusCheckboxes = document.querySelectorAll('.status-filter');
+            // Novos filtros de texto
+            const filterPedido = document.getElementById('filter-pedido');
+            const filterMotorista = document.getElementById('filter-motorista');
 
-            // Formatação de Moeda (Euro para pt-PT)
-            const formatCurrency = (v) => v.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+            // Elementos de Exportação
+            const exportPdfBtn = document.getElementById('export-pdf-btn');
+            const exportExcelBtn = document.getElementById('export-excel-btn');
 
-            // Funções de Extração
-            const extractPedidoNum = (f) => f ? (f.match(/(\d{9,})(?=\.pdf$)/i)?.[1] || f.replace('.pdf', '').split(' - ').pop()) : 'N/D';
-            
-            const extractCondutor = (f) => {
-                if (!f) return 'N/D';
-                const match = f.match(/Motorista - F GYN 03 - (.*?)(?=\s- \d{9,}\.pdf)/i);
-                if (match) return match[1].trim();
-                const parts = f.replace('.pdf', '').split(' - ');
-                return parts.length > 2 ? parts[parts.length - 2].trim() : 'N/D';
-            };
+            // Elementos de Notificação
+            const notificationEl = document.getElementById('notification');
+            const notificationMessageEl = document.getElementById('notification-message');
 
-            function showNotify(msg, isError = false) {
-                UI.notifyMsg.textContent = msg;
-                UI.notify.className = `fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 font-black text-[10px] uppercase tracking-widest ${isError ? 'bg-red-500' : 'bg-indigo-600'}`;
-                UI.notify.classList.remove('hidden');
-                setTimeout(() => UI.notify.classList.add('hidden'), 4000);
-            }
+            // --- Funções Helper ---
+            function formatCurrency(value) {
+                if (typeof value !== 'number') value = 0;
+                return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            }
 
-            // --- Lógica de Sincronização e Cache ---
+            // Função para extrair o número do pedido
+            function extractPedidoNum(fileName) {
+                if (typeof fileName !== 'string') return 'N/D';
+                // Tenta encontrar um número longo (9+ dígitos) no final
+                const match = fileName.match(/(\d{9,})(?=\.pdf$)/i);
+                if (match && match[1]) {
+                    return match[1];
+                }
+                // Plano B: Pega a última parte separada por ' - '
+                const parts = fileName.replace(/(\.pdf$)/i, '').split(' - ');
+                const lastPart = parts[parts.length - 1].trim();
+                if (/^\d{9,}$/.test(lastPart)) {
+                    return lastPart;
+                }
+                return 'N/D'; // Não encontrou
+            }
 
-            function updateSyncUI(status) {
-                if (status === 'syncing') {
-                    UI.syncIndicator.className = "sync-status status-pending";
-                    UI.syncText.textContent = "A Guardar...";
-                } else {
-                    UI.syncIndicator.className = "sync-status status-synced";
-                    UI.syncText.textContent = "Sincronizado";
-                }
-            }
+            // (NOVA) Função para extrair o nome do motorista
+            function extractMotorista(fileName) {
+                if (typeof fileName !== 'string') return 'N/D';
+                
+                // Tenta um regex mais específico primeiro (baseado no padrão "Acareação Motorista - F GYN 03 - NOME - PEDIDO.pdf")
+                let match = fileName.match(/Motorista - F GYN 03 - (.*?)(?=\s- \d{9,}\.pdf)/i);
+                if (match && match[1]) return match[1].trim();
+                
+                // Plano B: split por ' - '
+                const parts = fileName.replace(/(\.pdf$)/i, '').split(' - ');
+                if (parts.length > 2) {
+                    // Assumindo que o nome é o penúltimo fragmento
+                    const potentialName = parts[parts.length - 2].trim();
+                    // Verifica se não é um número e não é parte do nome do arquivo padrão
+                    if (potentialName.length > 3 && isNaN(potentialName) && !potentialName.toUpperCase().includes('F GYN 03')) {
+                        return potentialName;
+                    }
+                }
+                return 'N/D';
+            }
 
-            // Guarda localmente primeiro para resposta instantânea
-            function saveLocal() {
-                localStorage.setItem(CACHE_KEY, JSON.stringify(fullDataStore));
-                triggerSync();
-            }
+            let notificationTimeout;
+            function showNotification(message, isError = false) {
+                clearTimeout(notificationTimeout);
+                notificationMessageEl.textContent = message;
+                notificationEl.classList.remove('hidden', 'bg-red-500', 'bg-emerald-500');
+                notificationEl.classList.add(isError ? 'bg-red-500' : 'bg-emerald-500');
+                notificationTimeout = setTimeout(() => {
+                    notificationEl.classList.add('hidden');
+                }, 4000);
+            }
 
-            function triggerSync() {
-                if (syncTimeout) clearTimeout(syncTimeout);
-                updateSyncUI('syncing');
-                
-                syncTimeout = setTimeout(async () => {
-                    await performNetworkSync();
-                }, 2000); // Aguarda 2 segundos de inatividade para sincronizar
-            }
+            // --- Funções de Dados (GET e PUT) ---
+            async function getLatestData() {
+                try {
+                    const response = await fetch(`${DATABASE_URL}?_=${new Date().getTime()}`);
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                    const data = await response.json();
+                    if (!data.files) data.files = [];
+                    if (!data.solvedCount) data.solvedCount = 0;
+                    return data;
+                } catch (error) {
+                    console.error("Erro ao buscar dados:", error);
+                    showNotification("Não foi possível carregar os dados. Verifique sua conexão.", true);
+                    return null;
+                }
+            }
+            
+            async function saveData(dataToSave) {
+                if (isSaving) return; 
+                isSaving = true;
+                
+                try {
+                    const response = await fetch(DATABASE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dataToSave)
+                    });
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
+                    showNotification("Alterações salvas com sucesso!", false);
+                } catch (error) {
+                    console.error("Erro ao salvar dados:", error);
+                    showNotification("Ocorreu um erro ao salvar as alterações.", true);
+                } finally {
+                    isSaving = false; 
+                }
+            }
 
-            async function performNetworkSync(retry = 0) {
-                try {
-                    const res = await fetch(DATABASE_URL, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(fullDataStore)
-                    });
-                    if (!res.ok) throw new Error();
-                    updateSyncUI('synced');
-                } catch (e) {
-                    if (retry < 2) {
-                        setTimeout(() => performNetworkSync(retry + 1), 3000);
-                    } else {
-                        updateSyncUI('synced'); // Remove pulse mas avisa do erro
-                        showNotify("Erro ao sincronizar com servidor (Dados salvos localmente)", true);
-                    }
-                }
-            }
+            // --- Função Principal de Renderização e Filtro ---
+            function processAndRender() {
+                let files = fullDataStore.files;
 
-            async function loadInitialData() {
-                // Tenta carregar da cache primeiro para rapidez
-                const cached = localStorage.getItem(CACHE_KEY);
-                if (cached) {
-                    fullDataStore = JSON.parse(cached);
-                    processAndRender(true);
-                    UI.loading.style.display = 'none';
-                }
+                // 1. Coletar valores dos filtros
+                const startDate = filterDateStart.valueAsNumber;
+                const endDate = filterDateEnd.valueAsNumber;
+                const pedidoFilter = filterPedido.value.trim().toLowerCase(); // NOVO
+                const motoristaFilter = filterMotorista.value.trim().toLowerCase(); // NOVO
+                
+                const filterAll = filterStatusAll.checked; // "Todos" está marcado?
+                const selectedStatuses = [];
+                statusCheckboxes.forEach(cb => {
+                    if (cb.checked) {
+                        selectedStatuses.push(cb.id.replace('filter-status-', ''));
+                    }
+                });
 
-                // Sincroniza com o servidor em background
-                try {
-                    const res = await fetch(`${DATABASE_URL}?_=${Date.now()}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data && Array.isArray(data.files)) {
-                            fullDataStore = data;
-                            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-                            processAndRender(true);
-                        }
-                    }
-                } catch (e) {
-                    if (!cached) showNotify("Erro ao ligar ao servidor", true);
-                } finally {
-                    UI.loading.style.display = 'none';
-                }
-            }
+                // 2. Filtrar os dados
+                const filteredFiles = files.filter(file => {
+                    const uploadDate = file.uploadDate || 0;
+                    
+                    // Checagem de Data
+                    let dateMatch = true;
+                    if (startDate && uploadDate < startDate) {
+                        dateMatch = false;
+                    }
+                    if (endDate && uploadDate > (endDate + 86400000)) { // Inclui o dia todo
+                        dateMatch = false;
+                    }
 
-            // --- Renderização ---
+                    // Checagem de Status
+                    let statusMatch = false;
+                    if (filterAll) {
+                        statusMatch = true; 
+                    } else if (selectedStatuses.includes(file.status)) {
+                        statusMatch = true;
+                    }
 
-            function processAndRender(fullUpdate = true) {
-                const startDate = document.getElementById('filter-date-start').valueAsNumber;
-                const endDate = document.getElementById('filter-date-end').valueAsNumber;
-                const pedidoF = document.getElementById('filter-pedido').value.trim().toLowerCase();
-                const motoristaF = document.getElementById('filter-motorista').value.trim().toLowerCase();
-                const filterAll = document.getElementById('filter-status-all').checked;
+                    // (NOVO) Checagem de Texto (Pedido)
+                    let pedidoMatch = true;
+                    if (pedidoFilter) {
+                        const pedidoNum = extractPedidoNum(file.fileName).toLowerCase();
+                        pedidoMatch = pedidoNum.includes(pedidoFilter);
+                    }
 
-                const selStatus = Array.from(document.querySelectorAll('.status-filter'))
-                    .filter(cb => cb.checked)
-                    .map(cb => cb.id.replace('filter-status-', ''));
+                    // (NOVO) Checagem de Texto (Motorista)
+                    let motoristaMatch = true;
+                    if (motoristaFilter) {
+                        const motoristaName = extractMotorista(file.fileName).toLowerCase();
+                        motoristaMatch = motoristaName.includes(motoristaFilter);
+                    }
+                    
+                    return dateMatch && statusMatch && pedidoMatch && motoristaMatch;
+                });
 
-                filteredDataStore = fullDataStore.files.filter(f => {
-                    const date = f.uploadDate || 0;
-                    const dateMatch = (!startDate || date >= startDate) && (!endDate || date <= (endDate + 86400000));
-                    const statusMatch = filterAll || selStatus.includes(f.status);
-                    const pedidoMatch = !pedidoF || extractPedidoNum(f.fileName).toLowerCase().includes(pedidoF);
-                    const condutorMatch = !motoristaF || extractCondutor(f.fileName).toLowerCase().includes(motoristaF);
-                    return dateMatch && statusMatch && pedidoMatch && condutorMatch;
-                });
+                // Armazena dados filtrados para exportação
+                filteredDataStore = filteredFiles; 
 
-                updateSummary();
-                if (fullUpdate) renderTable();
-            }
+                // 3. Processar Resumo
+                let totalPedidos = 0;
+                let totalMultasPotencial = 0; // Este não é mais usado nos cards, mas ainda é calculado
+                let totalMultasMotorista = 0;
+                let totalMultasBase = 0;
+                let qtyMotorista = 0;
+                let qtyBase = 0;
+                // Novas variáveis para os pedidos de extravio
+                let totalPedidosMotorista = 0;
+                let totalPedidosBase = 0;
 
-            function updateSummary() {
-                let tPed = 0, tMultas = 0, tMot = 0, tBase = 0;
-                let qPed = filteredDataStore.length, qMultas = 0, qMot = 0, qBase = 0;
+                filteredFiles.forEach(file => {
+                    const valorPedido = file.valorPedido || 0;
+                    const valorMulta = file.valorMulta || 0;
 
-                filteredDataStore.forEach(f => {
-                    const vP = f.valorPedido || 0;
-                    const vM = f.valorMulta || 0;
-                    tPed += vP;
-                    if (f.status === 'extravio_motorista') { tMultas += vM; tMot += vM; qMot++; qMultas++; }
-                    else if (f.status === 'extravio_base') { tMultas += vM; tBase += vM; qBase++; qMultas++; }
-                });
+                    totalPedidos += valorPedido;
+                    totalMultasPotencial += valorMulta; // Mantido para cálculo geral se necessário, mas não exibido
 
-                UI.totalPedVal.textContent = formatCurrency(tPed);
-                UI.totalPedQty.textContent = `${qPed} documentos`;
-                UI.totalMultasVal.textContent = formatCurrency(tMultas);
-                UI.totalMultasQty.textContent = `${qMultas} documentos`;
-                UI.totalMotVal.textContent = formatCurrency(tMot);
-                UI.totalMotQty.textContent = `${qMot} documentos`;
-                UI.totalBaseVal.textContent = formatCurrency(tBase);
-                UI.totalBaseQty.textContent = `${qBase} documentos`;
-                UI.totalGeralVal.textContent = formatCurrency(tPed + tMultas);
-            }
+                    if (file.status === 'extravio_motorista') {
+                        totalMultasMotorista += valorMulta;
+                        totalPedidosMotorista += valorPedido; // Adiciona o valor do pedido
+                        qtyMotorista++;
+                    }
+                    if (file.status === 'extravio_base') {
+                        totalMultasBase += valorMulta;
+                        totalPedidosBase += valorPedido; // Adiciona o valor do pedido
+                        qtyBase++;
+                    }
+                });
 
-            function renderTable() {
-                if (filteredDataStore.length === 0) {
-                    UI.tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-20 text-slate-300 font-black uppercase text-[10px] tracking-widest">Sem Registos Correspondentes</td></tr>';
-                    return;
-                }
+                // (NOVA LÓGICA DE CÁLCULO)
+                const totalMultasAplicadas = totalMultasMotorista + totalMultasBase;
+                const totalGeral = totalPedidos + totalMultasAplicadas;
 
-                UI.tableBody.innerHTML = filteredDataStore
-                    .sort((a, b) => (b.uploadDate || 0) - (a.uploadDate || 0))
-                    .map(f => createRowHTML(f)).join('');
-            }
+                // 4. Atualizar UI do Resumo
+                totalPedidosValorEl.textContent = formatCurrency(totalPedidos);
+                totalPedidosQtyEl.textContent = `${filteredFiles.length} documento(s)`;
+                
+                // Atualiza card "Multas Aplicadas"
+                totalMultasAplicadasValorEl.textContent = formatCurrency(totalMultasAplicadas);
+                totalMultasAplicadasQtyEl.textContent = `${qtyMotorista + qtyBase} documento(s)`;
 
-            function createRowHTML(f) {
-                const statusMap = {
-                    'pending': 'bg-indigo-50 text-indigo-600',
-                    'impresso': 'bg-sky-50 text-sky-600',
-                    'extravio_motorista': 'bg-orange-50 text-orange-600',
-                    'extravio_base': 'bg-teal-50 text-teal-600',
-                    'expired': 'bg-red-50 text-red-600'
-                };
-                const labelMap = {
-                    'pending': 'Pendente', 'impresso': 'Impresso', 
-                    'extravio_motorista': 'Ext. Condutor', 'extravio_base': 'Ext. Base', 
-                    'expired': 'Vencido'
-                };
+                // Atualiza card "Extravio Motorista" (ADICIONADO DE VOLTA)
+                totalPedidosMotoristaValorEl.textContent = formatCurrency(totalPedidosMotorista); // Novo
+                totalMultasMotoristaValorEl.textContent = formatCurrency(totalMultasMotorista);
+                totalMultasMotoristaQtyEl.textContent = `${qtyMotorista} documento(s)`;
 
-                const valP = f.valorPedido || 0;
-                const valM = f.valorMulta || 0;
+                // Atualiza card "Extravio Base" (ADICIONADO DE VOLTA)
+                totalPedidosBaseValorEl.textContent = formatCurrency(totalPedidosBase); // Novo
+                totalMultasBaseValorEl.textContent = formatCurrency(totalMultasBase);
+                totalMultasBaseQtyEl.textContent = `${qtyBase} documento(s)`;
 
-                return `
-                    <tr class="hover:bg-slate-50 transition-colors" data-id="${f.id}">
-                        <td class="px-6 py-4 font-black text-slate-700 truncate max-w-[180px]" title="${f.fileName}">${f.fileName}</td>
-                        <td class="px-6 py-4 text-slate-400 font-bold">${extractPedidoNum(f.fileName)}</td>
-                        <td class="px-6 py-4 text-slate-500 font-bold">${extractCondutor(f.fileName)}</td>
-                        <td class="px-6 py-4">
-                            <span class="px-2 py-1 rounded text-[9px] font-black uppercase ${statusMap[f.status] || 'bg-slate-100'}">${labelMap[f.status] || 'N/D'}</span>
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <span class="view-mode font-black text-slate-800">${formatCurrency(valP)}</span>
-                            <input type="number" step="0.01" class="edit-mode edit-input w-24 text-right border border-indigo-200 rounded-lg px-2 py-1 outline-none focus:ring-2 ring-indigo-500" value="${valP}">
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <span class="view-mode font-black text-slate-800">${formatCurrency(valM)}</span>
-                            <input type="number" step="0.01" class="edit-mode edit-input w-24 text-right border border-indigo-200 rounded-lg px-2 py-1 outline-none focus:ring-2 ring-indigo-500" value="${valM}">
-                        </td>
-                        <td class="px-6 py-4 text-right font-black text-slate-900 bg-slate-50/50">
-                            ${formatCurrency(valP + valM)}
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <button class="edit-btn text-slate-300 hover:text-indigo-600 p-2 transition-colors">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                            </button>
-                            <button class="save-btn hidden text-emerald-500 hover:text-emerald-700 p-2 transition-colors">
-                                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }
+                // Atualiza "Valor Geral"
+                totalGeralValorEl.textContent = formatCurrency(totalGeral);
+                totalGeralQtyEl.textContent = `${filteredFiles.length} documento(s)`;
+                
+                // 5. Renderizar Tabela
+                reportTableBody.innerHTML = ''; // Limpa a tabela
+                if (filteredFiles.length === 0) {
+                    reportTableBody.innerHTML = `<tr id="empty-state-report"><td colspan="10" class="text-center py-10 text-slate-500">Nenhum documento encontrado para este filtro.</td></tr>`;
+                } else {
+                    // Ordena por data de envio (mais recente primeiro)
+                    filteredFiles.sort((a, b) => (b.uploadDate || 0) - (a.uploadDate || 0));
+                    filteredFiles.forEach(file => {
+                        reportTableBody.insertAdjacentHTML('beforeend', createReportRow(file));
+                    });
+                }
+            }
 
-            // --- Event Listeners ---
+            // --- Função para criar linha do relatório (com edição) ---
+            function createReportRow(file) {
+                const uploadDateFormatted = file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D';
+                const pedidoNum = extractPedidoNum(file.fileName);
+                const motoristaName = extractMotorista(file.fileName); // NOVO
+                const valorPedido = file.valorPedido || 0;
+                const valorMulta = file.valorMulta || 0;
+                const valorTotal = valorPedido + valorMulta; // NOVO CÁLCULO
+                
+                let statusText = 'N/D';
+                let statusClass = 'bg-slate-100 text-slate-800';
 
-            UI.tableBody.addEventListener('click', (e) => {
-                const tr = e.target.closest('tr');
-                if (!tr) return;
-                const id = tr.dataset.id;
+                switch(file.status) {
+                    case 'pending': statusText = 'Pendente'; statusClass = 'bg-indigo-100 text-indigo-800'; break;
+                    case 'impresso': statusText = 'Impresso'; statusClass = 'bg-sky-100 text-sky-800'; break;
+                    case 'expired': statusText = 'Vencido'; statusClass = 'bg-red-100 text-red-800'; break;
+                    case 'extravio_motorista': statusText = 'Extravio Motorista'; statusClass = 'bg-orange-100 text-orange-800'; break;
+                    case 'extravio_base': statusText = 'Extravio Base'; statusClass = 'bg-teal-100 text-teal-800'; break;
+                }
 
-                if (e.target.closest('.edit-btn')) {
-                    tr.querySelectorAll('.view-mode').forEach(el => el.classList.add('hidden'));
-                    tr.querySelectorAll('.edit-input').forEach(el => el.style.display = 'inline-block');
-                    tr.querySelector('.edit-btn').classList.add('hidden');
-                    tr.querySelector('.save-btn').classList.remove('hidden');
-                    return;
-                }
+                return `
+                    <tr class="bg-white hover:bg-slate-50" data-id="${file.id}">
+                        <td class="px-6 py-4 font-medium text-slate-900 whitespace-nowrap" title="${file.fileName}">${file.fileName}</td>
+                        <td class="px-6 py-4">${pedidoNum}</td>
+                        <td class="px-6 py-4">${motoristaName}</td>
+                        <td class="px-6 py-4">${file.folderName || 'N/D'}</td>
+                        <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${statusText}</span></td>
+                        
+                        <!-- Coluna Valor Pedido (Editável) -->
+                        <td class="px-6 py-4">
+                            <span class="edit-span" id="valor-pedido-span-${file.id}">${formatCurrency(valorPedido)}</span>
+                            <input type="number" value="${valorPedido}" id="valor-pedido-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                        </td>
+                        
+                        <!-- Coluna Valor Multa (Editável) -->
+                        <td class="px-6 py-4">
+                            <span class="edit-span" id="valor-multa-span-${file.id}">${formatCurrency(valorMulta)}</span>
+                            <input type="number" value="${valorMulta}" id="valor-multa-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                        </td>
+                        
+                        <!-- NOVA COLUNA VALOR TOTAL -->
+                        <td class="px-6 py-4 font-medium text-slate-700">
+                            ${formatCurrency(valorTotal)}
+                        </td>
+                        
+                        <td class="px-6 py-4">${uploadDateFormatted}</td>
+                        
+                        <!-- Coluna Ações (Editar/Salvar) -->
+                        <td class="px-6 py-4 text-center">
+                            <button title="Editar Valores" class="edit-btn text-indigo-600 hover:text-indigo-800" data-id="${file.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <button title="Salvar" class="save-btn text-green-600 hover:text-green-800 hidden" data-id="${file.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </td>
+                    </tr>`;
+            }
 
-                if (e.target.closest('.save-btn')) {
-                    const inputs = tr.querySelectorAll('input');
-                    const newValP = parseFloat(inputs[0].value) || 0;
-                    const newValM = parseFloat(inputs[1].value) || 0;
+            // --- Event Listeners ---
 
-                    // Atualização Local Instantânea
-                    const storeIdx = fullDataStore.files.findIndex(f => f.id === id);
-                    if (storeIdx > -1) {
-                        fullDataStore.files[storeIdx].valorPedido = newValP;
-                        fullDataStore.files[storeIdx].valorMulta = newValM;
-                    }
+            // Listener de Filtro
+            filterBtn.addEventListener('click', processAndRender);
+            // Adiciona listeners para filtrar ao digitar "Enter"
+            filterPedido.addEventListener('keypress', (e) => e.key === 'Enter' && processAndRender());
+            filterMotorista.addEventListener('keypress', (e) => e.key === 'Enter' && processAndRender());
 
-                    // Atualiza UI da linha
-                    tr.querySelector('td:nth-child(5) .view-mode').textContent = formatCurrency(newValP);
-                    tr.querySelector('td:nth-child(6) .view-mode').textContent = formatCurrency(newValM);
-                    tr.querySelector('td:nth-child(7)').textContent = formatCurrency(newValP + newValM);
-                    
-                    updateSummary();
+            // (NOVO) Listener do Botão Atualizar
+            refreshBtn.addEventListener('click', () => {
+                if (loadingEl) loadingEl.style.display = 'flex'; // Mostra o spinner
+                showNotification("Buscando dados atualizados...", false);
+                initializeApp(); // Re-executa a função principal
+            });
 
-                    tr.querySelectorAll('.view-mode').forEach(el => el.classList.remove('hidden'));
-                    tr.querySelectorAll('.edit-input').forEach(el => el.style.display = 'none');
-                    tr.querySelector('.edit-btn').classList.remove('hidden');
-                    tr.querySelector('.save-btn').classList.add('hidden');
-                    
-                    saveLocal(); // Sincroniza em background
-                }
-            });
 
-            document.getElementById('filter-btn').onclick = () => processAndRender(true);
-            document.getElementById('refresh-btn').onclick = () => loadInitialData();
+            // Listeners de Ações (Editar/Salvar) na Tabela
+            reportTableBody.addEventListener('click', async (event) => {
+                const editBtn = event.target.closest('.edit-btn');
+                const saveBtn = event.target.closest('.save-btn');
 
-            // Exportações Otimizadas
-            document.getElementById('export-excel-btn').onclick = () => {
-                const sheet = XLSX.utils.json_to_sheet(filteredDataStore.map(f => ({
-                    Ficheiro: f.fileName, Pedido: extractPedidoNum(f.fileName), 
-                    Condutor: extractCondutor(f.fileName), Estado: f.status, 
-                    Valor: f.valorPedido || 0, Multa: f.valorMulta || 0, Total: (f.valorPedido||0)+(f.valorMulta||0)
-                })));
-                const book = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(book, sheet, "Relatório");
-                XLSX.writeFile(book, "Portal_Relatorios_JT.xlsx");
-            };
+                if (editBtn) {
+                    const fileId = editBtn.dataset.id;
+                    const row = editBtn.closest('tr');
+                    
+                    // Esconde spans, mostra inputs
+                    row.querySelectorAll('.edit-span').forEach(el => el.style.display = 'none');
+                    row.querySelectorAll('.edit-input').forEach(el => el.style.display = 'block');
+                    
+                    // Troca botões
+                    editBtn.style.display = 'none';
+                    row.querySelector('.save-btn').style.display = 'block';
+                }
 
-            document.getElementById('export-pdf-btn').onclick = () => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF('l', 'pt');
-                doc.autoTable({
-                    head: [['Ficheiro', 'Pedido', 'Condutor', 'Estado', 'Valor', 'Multa', 'Total']],
-                    body: filteredDataStore.map(f => [
-                        f.fileName, extractPedidoNum(f.fileName), extractCondutor(f.fileName),
-                        f.status, formatCurrency(f.valorPedido||0), formatCurrency(f.valorMulta||0), 
-                        formatCurrency((f.valorPedido||0)+(f.valorMulta||0))
-                    ]),
-                    styles: { fontSize: 8 }
-                });
-                doc.save("Relatorio_Financeiro.pdf");
-            };
+                if (saveBtn) {
+                    const fileId = saveBtn.dataset.id;
+                    
+                    // Pega novos valores
+                    const novoValorPedido = parseFloat(document.getElementById(`valor-pedido-input-${fileId}`).value) || 0;
+                    const novoValorMulta = parseFloat(document.getElementById(`valor-multa-input-${fileId}`).value) || 0;
 
-            loadInitialData();
-        });
-    </script>
+                    // Lógica Crítica: Fetch-Modify-Save
+                    const freshData = await getLatestData();
+                    if (!freshData) return; // Erro já notificado
+
+                    const fileIndex = freshData.files.findIndex(f => f.id === fileId);
+                    if (fileIndex > -1) {
+                        freshData.files[fileIndex].valorPedido = novoValorPedido;
+                        freshData.files[fileIndex].valorMulta = novoValorMulta;
+                    }
+
+                    await saveData(freshData); // Salva no npoint
+
+                    // Atualiza o store local e re-renderiza
+                    fullDataStore = freshData;
+                    processAndRender();
+                }
+            });
+
+            // --- Listeners de Exportação ---
+            exportExcelBtn.addEventListener('click', () => {
+                if (filteredDataStore.length === 0) {
+                    showNotification("Nenhum dado para exportar.", true);
+                    return;
+                }
+
+                // Prepara dados para Excel
+                const dataToExport = filteredDataStore.map(file => ({
+                    "Nome do Arquivo": file.fileName,
+                    "Nº Pedido": extractPedidoNum(file.fileName),
+                    "Motorista": extractMotorista(file.fileName),
+                    "Pasta (Data Envio)": file.folderName,
+                    "Status": file.status,
+                    "Valor Pedido (S/ Multa) (R$)": file.valorPedido || 0,
+                    "Valor Multa (R$)": file.valorMulta || 0,
+                    "Valor Total (C/ Multa) (R$)": (file.valorPedido || 0) + (file.valorMulta || 0),
+                    "Data Envio": file.uploadDate ? new Date(file.uploadDate).toLocaleString('pt-BR') : 'N/D',
+                    "Prazo Final": file.deadline ? new Date(file.deadline).toLocaleString('pt-BR') : 'N/D'
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+                XLSX.writeFile(wb, "Relatorio_Acareacoes.xlsx");
+            });
+
+            exportPdfBtn.addEventListener('click', () => {
+                if (filteredDataStore.length === 0) {
+                    showNotification("Nenhum dado para exportar.", true);
+                    return;
+                }
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape' }); // Deixa o PDF mais largo
+
+                // Prepara dados para PDF AutoTable
+                const head = [["Arquivo", "Nº Pedido", "Motorista", "Pasta", "Status", "V. Pedido (S/ M)", "V. Multa", "V. Total (C/ M)", "Data Envio"]];
+                const body = filteredDataStore.map(file => {
+                    const valorPedido = file.valorPedido || 0;
+                    const valorMulta = file.valorMulta || 0;
+                    return [
+                        file.fileName,
+                        extractPedidoNum(file.fileName),
+                        extractMotorista(file.fileName),
+                        file.folderName,
+                        file.status,
+                        formatCurrency(valorPedido),
+                        formatCurrency(valorMulta),
+                        formatCurrency(valorPedido + valorMulta),
+                        file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D'
+                    ];
+                });
+
+                doc.autoTable({
+                    head: head,
+                    body: body,
+                    styles: { fontSize: 6, cellPadding: 1.5 }, // Diminui a fonte
+                    headStyles: { fillColor: [22, 160, 133] }, // Cor verde-água
+                    columnStyles: {
+                        0: { cellWidth: 50 }, // Arquivo
+                        1: { cellWidth: 22 }, // Nº Pedido
+                        2: { cellWidth: 30 }, // Motorista
+                        3: { cellWidth: 15 }, // Pasta
+                        4: { cellWidth: 25 }, // Status
+                        5: { cellWidth: 20 }, // V. Pedido
+                        6: { cellWidth: 20 }, // V. Multa
+                        7: { cellWidth: 22 }, // V. Total
+                        8: { cellWidth: 20 }, // Data Envio
+                    }
+                });
+
+                doc.save("Relatorio_Acareacoes.pdf");
+            });
+
+
+            // --- Inicialização ---
+            async function initializeApp() {
+                try {
+                    const initialData = await getLatestData();
+                    if (initialData) {
+                        fullDataStore = initialData;
+                        processAndRender(); // Renderiza tudo (sem filtro)
+                    } else {
+                        showNotification("Falha ao carregar dados iniciais.", true);
+                    }
+                } catch (error) {
+                    console.error("Erro na inicialização:", error);
+                    showNotification("Erro fatal ao carregar. Tente recarregar a página.", true);
+                } finally {
+                    if (loadingEl) loadingEl.style.display = 'none'; // Sempre esconde o spinner
+                }
+            }
+            
+            initializeApp();
+        });
+    </script>
 </body>
 </html>
