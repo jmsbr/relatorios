@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Relatórios</title>
+    <title>Portal de Relatórios - JMSBR</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Bibliotecas de Exportação -->
@@ -13,717 +13,500 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc; /* bg-slate-50 */
+            background-color: #f8fafc;
         }
-        /* Estilo para o spinner de carregamento inicial */
         #initial-loading {
             position: fixed;
             inset: 0;
-            background-color: rgba(248, 250, 252, 0.8);
+            background-color: rgba(248, 250, 252, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 100;
         }
-        /* Esconde inputs de edição por padrão */
         .edit-input { display: none; }
+        .row-editing .edit-span { display: none; }
+        .row-editing .edit-input { display: block; }
+        
+        /* Consola de Migração */
+        #migration-console {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            max-height: 500px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            z-index: 60;
+            padding: 20px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body class="bg-slate-50">
 
     <!-- Loading Inicial -->
     <div id="initial-loading">
-        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg class="animate-spin h-12 w-12 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <p class="mt-4 text-slate-600">Carregando relatórios...</p>
+        <p id="loading-text" class="mt-4 text-slate-700 font-medium tracking-tight">A sincronizar com Firebase...</p>
     </div>
 
-    <!-- Elemento de Notificação -->
-    <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-md shadow-lg text-white transition-opacity duration-300 max-w-sm">
-        <p id="notification-message"></p>
+    <!-- Notificação -->
+    <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 max-w-sm">
+        <p id="notification-message" class="text-sm font-semibold"></p>
+    </div>
+
+    <!-- Consola de Migração de Dados -->
+    <div id="migration-console">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                <h3 class="font-bold text-slate-800">Migração de Dados (251 itens)</h3>
+            </div>
+            <button onclick="document.getElementById('migration-console').style.display='none'" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">1. Selecionar Ficheiro JSON</label>
+            <input type="file" id="migration-file-input" accept=".txt,.json" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+        </div>
+
+        <div id="migration-progress-container" class="hidden mb-4">
+            <div class="flex justify-between text-[10px] font-bold text-slate-500 mb-1">
+                <span>PROGRESSO</span>
+                <span id="migration-perc">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5">
+                <div id="migration-bar" class="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div id="migration-log" class="bg-slate-900 p-3 rounded-lg text-[10px] font-mono mb-4 h-40 overflow-y-auto text-indigo-300 border border-slate-800">
+            Aguardando ficheiro...
+        </div>
+
+        <button id="start-migration-btn" disabled class="w-full bg-slate-200 text-slate-400 cursor-not-allowed font-bold py-3 rounded-xl text-sm transition-all shadow-lg shadow-indigo-100">
+            Iniciar Migração
+        </button>
     </div>
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
-        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div>
-                <h1 class="text-3xl font-bold text-slate-800">Portal de Relatórios</h1>
-                <p class="text-slate-600 mt-1">Filtre, edite e exporte os dados financeiros.</p>
+                <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Portal de Relatórios</h1>
+                <p class="text-slate-500 mt-1 flex items-center">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full mr-2"></span>
+                    Base de dados Firebase Ativa
+                </p>
             </div>
-            <div class="flex items-center space-x-4 md:space-x-6 mt-4 sm:mt-0">
-                <!-- NOVO BOTÃO ATUALIZAR -->
-                <button id="refresh-btn" class="p-2 bg-white rounded-md shadow-sm border border-slate-200 text-slate-600 hover:bg-slate-50" title="Atualizar Dados">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.004 12.09A7.002 7.002 0 0114.001 9.5a1 1 0 111.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 111.885-.666A5.002 5.002 0 005.999 17H9a1 1 0 110-2H4.004v-1.001z" clip-rule="evenodd" />
-                    </svg>
+            <div class="flex items-center space-x-3 mt-4 sm:mt-0">
+                <button id="show-migration-btn" class="bg-amber-50 text-amber-600 hover:bg-amber-100 px-4 py-2 rounded-xl font-bold text-xs uppercase transition-all flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    Migrar 251 Itens
                 </button>
-                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo J&T Express" class="h-16 w-auto" onerror="this.style.display='none'">
+                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logótipo J&T Express" class="h-10 w-auto">
             </div>
         </header>
 
         <!-- Filtros -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
-            <h2 class="text-xl font-semibold text-slate-800 mb-4">Filtros de Relatório</h2>
-            <!-- Filtros de Data e Botão -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
-                    <label for="filter-date-start" class="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
-                    <input type="date" id="filter-date-start" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Início</label>
+                    <input type="date" id="filter-date-start" class="w-full px-4 py-2 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
-                    <label for="filter-date-end" class="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
-                    <input type="date" id="filter-date-end" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                 <div class="flex items-end">
-                    <button id="filter-btn" class="w-full md:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 flex items-center justify-center space-x-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L13 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 019 17v-5.586L4.293 6.707A1 1 0 014 6V3z" clip-rule="evenodd" /></svg>
-                        <span>Filtrar</span>
-                    </button>
-                 </div>
-            </div>
-            <!-- (NOVO) Filtros de Texto -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                <div>
-                    <label for="filter-pedido" class="block text-sm font-medium text-slate-700 mb-1">Filtrar por Nº Pedido</label>
-                    <input type="text" id="filter-pedido" placeholder="Digite o número do pedido" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Fim</label>
+                    <input type="date" id="filter-date-end" class="w-full px-4 py-2 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
-                    <label for="filter-motorista" class="block text-sm font-medium text-slate-700 mb-1">Filtrar por Motorista</label>
-                    <input type="text" id="filter-motorista" placeholder="Digite o nome do motorista" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nº Encomenda</label>
+                    <input type="text" id="filter-pedido" placeholder="888..." class="w-full px-4 py-2 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
-            </div>
-            <!-- Filtros de Status -->
-            <div class="mt-6">
-                <label class="block text-sm font-medium text-slate-700 mb-2">Filtrar por Status</label>
-                <div class="flex flex-wrap gap-x-6 gap-y-2">
-                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-all" class="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Todos</span></label>
-                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-pending" class="status-filter h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Pendentes</span></label>
-                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-impresso" class="status-filter h-4 w-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Impressos</span></label>
-                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-expired" class="status-filter h-4 w-4 rounded text-red-600 focus:ring-red-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Vencidos</span></label>
-                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-extravio_motorista" class="status-filter h-4 w-4 rounded text-orange-600 focus:ring-orange-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Extravio Motorista</span></label>
-                    <label class="inline-flex items-center"><input type="checkbox" id="filter-status-extravio_base" class="status-filter h-4 w-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300" checked> <span class="ml-2 text-slate-700">Extravio Base</span></label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Resumo Financeiro (com Quantidade) -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 mb-8">
-            <h2 class="text-xl font-semibold text-slate-800 mb-6">Resumo do Filtro</h2>
-            <!-- Grid ajustado para 5 colunas em telas grandes -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                <!-- Valor Total dos Pedidos (S/ Multa) -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-blue-200 flex items-start space-x-4">
-                    <div class="bg-blue-100 rounded-full w-12 h-12 flex items-center justify-center">
-                        <svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.768 0-1.536.219-2.121.659L9 13.182m0 0A7.5 7.5 0 1012 5.25v.75" /></svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Valor Pedidos (S/ Multa)</h3>
-                        <p id="total-pedidos-valor" class="text-2xl font-bold text-blue-600 mt-1">R$ 0,00</p>
-                        <p id="total-pedidos-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
-                    </div>
-                </div>
-                <!-- Valor Total Multas (Aplicadas) -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-amber-200 flex items-start space-x-4">
-                    <div class="bg-amber-100 rounded-full w-12 h-12 flex items-center justify-center">
-                         <svg class="h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" /></svg>
-                    </div>
-                    <div>
-                        <!-- Título Atualizado -->
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total de Multas (Extravios)</h3>
-                        <p id="total-multas-aplicadas-valor" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</p>
-                        <p id="total-multas-aplicadas-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
-                    </div>
-                </div>
-                
-                <!-- Total Extravio Motorista (ADICIONADO DE VOLTA) -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-orange-200 flex items-start space-x-4">
-                    <div class="bg-orange-100 rounded-full w-12 h-12 flex items-center justify-center">
-                        <svg class="h-6 w-6 text-orange-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h.008v.008h-.008v-.008zm0 0H20.625a1.125 1.125 0 001.125-1.125V14.25" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Extrav. Motorista</h3>
-                        <!-- Pedidos (Sem Multa) -->
-                        <p class="text-sm font-medium text-slate-500 mt-1">Pedidos (S/ Multa):</p>
-                        <p id="total-pedidos-motorista-valor" class="text-lg font-bold text-orange-600">R$ 0,00</p>
-                        <!-- Multas -->
-                        <p class="text-sm font-medium text-slate-500 mt-1">Multas:</p>
-                        <p id="total-multas-motorista-valor" class="text-lg font-bold text-orange-600">R$ 0,00</p>
-                        <!-- Quantidade -->
-                        <p id="total-multas-motorista-qty" class="text-sm font-medium text-slate-500 mt-2">0 documentos</p>
-                    </div>
-                </div>
-                 <!-- Total Extravio Base (ADICIONADO DE VOLTA) -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-teal-200 flex items-start space-x-4">
-                    <div class="bg-teal-100 rounded-full w-12 h-12 flex items-center justify-center">
-                       <svg class="h-6 w-6 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.75M9 11.25h6.75" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Total Extrav. Base</h3>
-                        <!-- Pedidos (Sem Multa) -->
-                        <p class="text-sm font-medium text-slate-500 mt-1">Pedidos (S/ Multa):</p>
-                        <p id="total-pedidos-base-valor" class="text-lg font-bold text-teal-600">R$ 0,00</p>
-                        <!-- Multas -->
-                        <p class="text-sm font-medium text-slate-500 mt-1">Multas:</p>
-                        <p id="total-multas-base-valor" class="text-lg font-bold text-teal-600">R$ 0,00</p>
-                        <!-- Quantidade -->
-                        <p id="total-multas-base-qty" class="text-sm font-medium text-slate-500 mt-2">0 documentos</p>
-                    </div>
-                </div>
-
-                <!-- Valor Total Geral (Pedidos + Multas Aplicadas) -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-300 flex items-start space-x-4">
-                    <div class="bg-slate-100 rounded-full w-12 h-12 flex items-center justify-center">
-                       <svg class="h-6 w-6 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 8.25v-1.875A3.375 3.375 0 008.625 3H5.25A3.375 3.375 0 001.875 6.375v11.25A3.375 3.375 0 005.25 21h13.5A3.375 3.375 0 0022.125 17.625V10.5A3.375 3.375 0 0018.75 7.125h-3.375A3.375 3.375 0 0012 3.75v4.5zM12 8.25h1.875a3.375 3.375 0 013.375 3.375v11.25A3.375 3.375 0 0113.5 21h-3A3.375 3.375 0 017.125 17.625V11.625a3.375 3.375 0 013.375-3.375H12z" />
-                       </svg>
-                    </div>
-                    <div>
-                        <!-- Título Atualizado -->
-                        <h3 class="text-sm font-semibold text-slate-500 uppercase">Valor Total Geral (c/ Multas)</h3>
-                        <p id="total-geral-valor" class="text-2xl font-bold text-slate-600 mt-1">R$ 0,00</p>
-                        <p id="total-geral-qty" class="text-sm font-medium text-slate-500 mt-1">0 documentos</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Relatório Detalhado -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-8">
-            <div class="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <h2 class="text-xl font-semibold text-slate-800">Relatório Detalhado de Documentos</h2>
-                <div class="flex space-x-3 mt-4 sm:mt-0">
-                    <button id="export-excel-btn" class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-md hover:bg-emerald-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM4 8h5v2H4V8z" clip-rule="evenodd" /></svg>
-                        <span>Exportar Excel</span>
-                    </button>
-                    <button id="export-pdf-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
-                        <span>Exportar PDF</span>
-                    </button>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Motorista</label>
+                    <input type="text" id="filter-motorista" placeholder="Nome..." class="w-full px-4 py-2 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
             </div>
             
+            <div class="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-6">
+                <span class="text-xs font-bold text-slate-400 uppercase">Status:</span>
+                <label class="flex items-center text-sm text-slate-600 font-medium cursor-pointer"><input type="checkbox" id="filter-status-all" class="rounded-md text-indigo-600 mr-2 border-slate-300" checked> Todos</label>
+                <label class="flex items-center text-sm text-slate-600 font-medium cursor-pointer"><input type="checkbox" id="filter-status-pending" class="status-filter rounded-md text-indigo-600 mr-2 border-slate-300" checked> Pendentes</label>
+                <label class="flex items-center text-sm text-slate-600 font-medium cursor-pointer"><input type="checkbox" id="filter-status-impresso" class="status-filter rounded-md text-sky-600 mr-2 border-slate-300" checked> Impressos</label>
+                <label class="flex items-center text-sm text-slate-600 font-medium cursor-pointer"><input type="checkbox" id="filter-status-extravio_motorista" class="status-filter rounded-md text-orange-600 mr-2 border-slate-300" checked> Extr. Motorista</label>
+                <label class="flex items-center text-sm text-slate-600 font-medium cursor-pointer"><input type="checkbox" id="filter-status-extravio_base" class="status-filter rounded-md text-teal-600 mr-2 border-slate-300" checked> Extr. Base</label>
+                <div class="ml-auto">
+                    <button id="apply-filters-btn" class="bg-slate-900 hover:bg-black text-white px-8 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-slate-200">Filtrar Resultados</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards de Resumo -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-transform hover:scale-[1.02]">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="p-3 bg-blue-50 text-blue-600 rounded-2xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
+                    <span id="qty-total-pedidos" class="text-xs font-bold text-slate-400">0 docs</span>
+                </div>
+                <h3 class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Total Encomendas</h3>
+                <p id="total-pedidos-valor" class="text-2xl font-bold text-slate-800 mt-1">R$ 0,00</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-orange-200 shadow-sm transition-transform hover:scale-[1.02]">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="p-3 bg-orange-50 text-orange-600 rounded-2xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></span>
+                    <span id="qty-extravio-motorista" class="text-xs font-bold text-orange-400">0 docs</span>
+                </div>
+                <h3 class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Multa Motorista</h3>
+                <p id="total-multas-motorista" class="text-2xl font-bold text-orange-600 mt-1">R$ 0,00</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-teal-200 shadow-sm transition-transform hover:scale-[1.02]">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="p-3 bg-teal-50 text-teal-600 rounded-2xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></span>
+                    <span id="qty-extravio-base" class="text-xs font-bold text-teal-400">0 docs</span>
+                </div>
+                <h3 class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Multa Base</h3>
+                <p id="total-multas-base" class="text-2xl font-bold text-teal-600 mt-1">R$ 0,00</p>
+            </div>
+
+            <div class="bg-indigo-600 p-6 rounded-2xl shadow-xl shadow-indigo-200 transition-transform hover:scale-[1.02]">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="p-3 bg-indigo-500/50 text-white rounded-2xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></span>
+                    <span id="qty-total-geral" class="text-xs font-bold text-indigo-200">0 docs</span>
+                </div>
+                <h3 class="text-indigo-100 text-[10px] font-bold uppercase tracking-widest">Valor Total Geral</h3>
+                <p id="total-geral-valor" class="text-2xl font-bold text-white mt-1">R$ 0,00</p>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100">
+                <h2 class="text-xl font-bold text-slate-800">Listagem Consolidada</h2>
+                <div class="flex space-x-3 mt-4 sm:mt-0">
+                    <button id="export-excel-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-xl flex items-center transition-all text-xs">Exportar Excel</button>
+                    <button id="export-pdf-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-5 rounded-xl flex items-center transition-all text-xs">Gerar PDF</button>
+                </div>
+            </div>
+
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left text-slate-600" id="report-table">
-                    <thead class="bg-slate-50 text-xs text-slate-700 uppercase">
+                <table class="w-full text-sm text-left text-slate-600" id="main-table">
+                    <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-bold border-b border-slate-100">
                         <tr>
-                            <th scope="col" class="px-6 py-3">Nome do Arquivo</th>
-                            <th scope="col" class="px-6 py-3">Nº Pedido</th>
-                            <th scope="col" class="px-6 py-3">Motorista</th>
-                            <th scope="col" class="px-6 py-3">Pasta</th>
-                            <th scope="col" class="px-6 py-3">Status</th>
-                            <th scope="col" class="px-6 py-3">Valor Pedido (S/ Multa)</th>
-                            <th scope="col" class="px-6 py-3">Valor Multa</th>
-                            <th scope="col" class="px-6 py-3">Valor Total (C/ Multa)</th>
-                            <th scope="col" class="px-6 py-3">Data de Envio</th>
-                            <th scope="col" class="px-6 py-3 text-center">Ações</th>
+                            <th class="px-6 py-4">Ficheiro / Motorista</th>
+                            <th class="px-6 py-4">Nº Encomenda</th>
+                            <th class="px-6 py-4">Status</th>
+                            <th class="px-6 py-4 text-right">V. Pedido</th>
+                            <th class="px-6 py-4 text-right">V. Multa</th>
+                            <th class="px-6 py-4 text-right">Total</th>
+                            <th class="px-6 py-4">Data Envio</th>
+                            <th class="px-6 py-4 text-center">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="report-table-body" class="divide-y divide-slate-200">
-                        <tr id="empty-state-report"><td colspan="10" class="text-center py-10 text-slate-500">Nenhum documento encontrado.</td></tr>
+                    <tbody id="table-body" class="divide-y divide-slate-50">
                     </tbody>
                 </table>
             </div>
+            
+            <div id="empty-state" class="p-24 text-center">
+                <div class="bg-slate-50 inline-block p-8 rounded-full mb-4">
+                    <svg class="w-12 h-12 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                </div>
+                <p id="empty-state-text" class="text-slate-400 font-medium">A aguardar conexão ao Firebase...</p>
+            </div>
         </div>
-
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    <!-- Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, doc, updateDoc, setDoc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLtYecb_VeHuqNUiqkDwIoQQP_3HuW2vg",
+            authDomain: "jmsbr-81be4.firebaseapp.com",
+            projectId: "jmsbr-81be4",
+            storageBucket: "jmsbr-81be4.firebasestorage.app",
+            messagingSenderId: "461966861390",
+            appId: "1:461966861390:web:2e8e1a164f99f7719c4f1f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = "jmsbr-81be4";
+
+        let allDocuments = [];
+        let filteredDocuments = [];
+        let dataToMigrate = [];
+        
+        const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'acareacoes');
+
+        // Helpers
+        const fmtBRL = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const fmtDate = (v) => v ? new Date(v).toLocaleDateString('pt-PT') : '-';
+
+        function extractPedido(fileName) {
+            if (!fileName) return '-';
+            const match = fileName.match(/(\d{9,})(?=\.pdf$)/i);
+            return match ? match[1] : fileName.split(' - ').pop().replace('.pdf', '');
+        }
+
+        function extractMotorista(fileName) {
+            if (!fileName) return 'N/A';
+            const parts = fileName.split(' - ');
+            return parts.length >= 3 ? parts[parts.length - 2].trim() : 'Motorista Indefinido';
+        }
+
+        function notify(msg, type = 'success') {
+            const el = document.getElementById('notification');
+            const txt = document.getElementById('notification-message');
+            txt.textContent = msg;
+            el.className = `fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl transition-all duration-300 max-w-sm ${type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            const emptyState = document.getElementById('empty-state');
             
-            // -------------------------------------------------------------------------
-            // URL DO BANCO DE DADOS ONLINE - DEVE SER A MESMA DO PAINEL
-            const DATABASE_URL = "https://api.npoint.io/ef789e8a4e2cd9900cf7";
-            // -------------------------------------------------------------------------
-
-            // --- Variáveis Globais ---
-            let fullDataStore = { files: [], solvedCount: 0 }; // Armazena todos os dados
-            let filteredDataStore = []; // Armazena dados filtrados para exportação
-            let isSaving = false; // Flag para evitar conflitos de salvamento
-            
-            // --- Elementos da UI ---
-            const loadingEl = document.getElementById('initial-loading');
-            
-            // Elementos do Resumo
-            const totalPedidosValorEl = document.getElementById('total-pedidos-valor');
-            const totalPedidosQtyEl = document.getElementById('total-pedidos-qty');
-            // IDs atualizados
-            const totalMultasAplicadasValorEl = document.getElementById('total-multas-aplicadas-valor');
-            const totalMultasAplicadasQtyEl = document.getElementById('total-multas-aplicadas-qty');
-            // IDs dos cards adicionados de volta
-            const totalMultasMotoristaValorEl = document.getElementById('total-multas-motorista-valor');
-            const totalMultasMotoristaQtyEl = document.getElementById('total-multas-motorista-qty');
-            const totalMultasBaseValorEl = document.getElementById('total-multas-base-valor');
-            const totalMultasBaseQtyEl = document.getElementById('total-multas-base-qty');
-            // IDs para os novos campos de Pedidos (S/ Multa) nos cards de extravio
-            const totalPedidosMotoristaValorEl = document.getElementById('total-pedidos-motorista-valor');
-            const totalPedidosBaseValorEl = document.getElementById('total-pedidos-base-valor');
-
-            const totalGeralValorEl = document.getElementById('total-geral-valor');
-            const totalGeralQtyEl = document.getElementById('total-geral-qty');
-            
-            // Elementos da Tabela
-            const reportTableBody = document.getElementById('report-table-body');
-            const emptyStateReport = document.getElementById('empty-state-report');
-
-            // Elementos de Filtro
-            const filterBtn = document.getElementById('filter-btn');
-            const refreshBtn = document.getElementById('refresh-btn'); // NOVO
-            const filterDateStart = document.getElementById('filter-date-start');
-            const filterDateEnd = document.getElementById('filter-date-end');
-            const filterStatusAll = document.getElementById('filter-status-all');
-            const statusCheckboxes = document.querySelectorAll('.status-filter');
-            // Novos filtros de texto
-            const filterPedido = document.getElementById('filter-pedido');
-            const filterMotorista = document.getElementById('filter-motorista');
-
-            // Elementos de Exportação
-            const exportPdfBtn = document.getElementById('export-pdf-btn');
-            const exportExcelBtn = document.getElementById('export-excel-btn');
-
-            // Elementos de Notificação
-            const notificationEl = document.getElementById('notification');
-            const notificationMessageEl = document.getElementById('notification-message');
-
-            // --- Funções Helper ---
-            function formatCurrency(value) {
-                if (typeof value !== 'number') value = 0;
-                return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            if (filteredDocuments.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                document.getElementById('empty-state-text').textContent = "Nenhum registo encontrado no Firebase.";
+                return;
             }
 
-            // Função para extrair o número do pedido
-            function extractPedidoNum(fileName) {
-                if (typeof fileName !== 'string') return 'N/D';
-                // Tenta encontrar um número longo (9+ dígitos) no final
-                const match = fileName.match(/(\d{9,})(?=\.pdf$)/i);
-                if (match && match[1]) {
-                    return match[1];
-                }
-                // Plano B: Pega a última parte separada por ' - '
-                const parts = fileName.replace(/(\.pdf$)/i, '').split(' - ');
-                const lastPart = parts[parts.length - 1].trim();
-                if (/^\d{9,}$/.test(lastPart)) {
-                    return lastPart;
-                }
-                return 'N/D'; // Não encontrou
-            }
-
-            // (NOVA) Função para extrair o nome do motorista
-            function extractMotorista(fileName) {
-                if (typeof fileName !== 'string') return 'N/D';
-                
-                // Tenta um regex mais específico primeiro (baseado no padrão "Acareação Motorista - F GYN 03 - NOME - PEDIDO.pdf")
-                let match = fileName.match(/Motorista - F GYN 03 - (.*?)(?=\s- \d{9,}\.pdf)/i);
-                if (match && match[1]) return match[1].trim();
-                
-                // Plano B: split por ' - '
-                const parts = fileName.replace(/(\.pdf$)/i, '').split(' - ');
-                if (parts.length > 2) {
-                    // Assumindo que o nome é o penúltimo fragmento
-                    const potentialName = parts[parts.length - 2].trim();
-                    // Verifica se não é um número e não é parte do nome do arquivo padrão
-                    if (potentialName.length > 3 && isNaN(potentialName) && !potentialName.toUpperCase().includes('F GYN 03')) {
-                        return potentialName;
-                    }
-                }
-                return 'N/D';
-            }
-
-            let notificationTimeout;
-            function showNotification(message, isError = false) {
-                clearTimeout(notificationTimeout);
-                notificationMessageEl.textContent = message;
-                notificationEl.classList.remove('hidden', 'bg-red-500', 'bg-emerald-500');
-                notificationEl.classList.add(isError ? 'bg-red-500' : 'bg-emerald-500');
-                notificationTimeout = setTimeout(() => {
-                    notificationEl.classList.add('hidden');
-                }, 4000);
-            }
-
-            // --- Funções de Dados (GET e PUT) ---
-            async function getLatestData() {
-                try {
-                    const response = await fetch(`${DATABASE_URL}?_=${new Date().getTime()}`);
-                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
-                    const data = await response.json();
-                    if (!data.files) data.files = [];
-                    if (!data.solvedCount) data.solvedCount = 0;
-                    return data;
-                } catch (error) {
-                    console.error("Erro ao buscar dados:", error);
-                    showNotification("Não foi possível carregar os dados. Verifique sua conexão.", true);
-                    return null;
-                }
-            }
-            
-            async function saveData(dataToSave) {
-                if (isSaving) return; 
-                isSaving = true;
-                
-                try {
-                    const response = await fetch(DATABASE_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(dataToSave)
-                    });
-                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
-                    showNotification("Alterações salvas com sucesso!", false);
-                } catch (error) {
-                    console.error("Erro ao salvar dados:", error);
-                    showNotification("Ocorreu um erro ao salvar as alterações.", true);
-                } finally {
-                    isSaving = false; 
-                }
-            }
-
-            // --- Função Principal de Renderização e Filtro ---
-            function processAndRender() {
-                let files = fullDataStore.files;
-
-                // 1. Coletar valores dos filtros
-                const startDate = filterDateStart.valueAsNumber;
-                const endDate = filterDateEnd.valueAsNumber;
-                const pedidoFilter = filterPedido.value.trim().toLowerCase(); // NOVO
-                const motoristaFilter = filterMotorista.value.trim().toLowerCase(); // NOVO
-                
-                const filterAll = filterStatusAll.checked; // "Todos" está marcado?
-                const selectedStatuses = [];
-                statusCheckboxes.forEach(cb => {
-                    if (cb.checked) {
-                        selectedStatuses.push(cb.id.replace('filter-status-', ''));
-                    }
-                });
-
-                // 2. Filtrar os dados
-                const filteredFiles = files.filter(file => {
-                    const uploadDate = file.uploadDate || 0;
-                    
-                    // Checagem de Data
-                    let dateMatch = true;
-                    if (startDate && uploadDate < startDate) {
-                        dateMatch = false;
-                    }
-                    if (endDate && uploadDate > (endDate + 86400000)) { // Inclui o dia todo
-                        dateMatch = false;
-                    }
-
-                    // Checagem de Status
-                    let statusMatch = false;
-                    if (filterAll) {
-                        statusMatch = true; 
-                    } else if (selectedStatuses.includes(file.status)) {
-                        statusMatch = true;
-                    }
-
-                    // (NOVO) Checagem de Texto (Pedido)
-                    let pedidoMatch = true;
-                    if (pedidoFilter) {
-                        const pedidoNum = extractPedidoNum(file.fileName).toLowerCase();
-                        pedidoMatch = pedidoNum.includes(pedidoFilter);
-                    }
-
-                    // (NOVO) Checagem de Texto (Motorista)
-                    let motoristaMatch = true;
-                    if (motoristaFilter) {
-                        const motoristaName = extractMotorista(file.fileName).toLowerCase();
-                        motoristaMatch = motoristaName.includes(motoristaFilter);
-                    }
-                    
-                    return dateMatch && statusMatch && pedidoMatch && motoristaMatch;
-                });
-
-                // Armazena dados filtrados para exportação
-                filteredDataStore = filteredFiles; 
-
-                // 3. Processar Resumo
-                let totalPedidos = 0;
-                let totalMultasPotencial = 0; // Este não é mais usado nos cards, mas ainda é calculado
-                let totalMultasMotorista = 0;
-                let totalMultasBase = 0;
-                let qtyMotorista = 0;
-                let qtyBase = 0;
-                // Novas variáveis para os pedidos de extravio
-                let totalPedidosMotorista = 0;
-                let totalPedidosBase = 0;
-
-                filteredFiles.forEach(file => {
-                    const valorPedido = file.valorPedido || 0;
-                    const valorMulta = file.valorMulta || 0;
-
-                    totalPedidos += valorPedido;
-                    totalMultasPotencial += valorMulta; // Mantido para cálculo geral se necessário, mas não exibido
-
-                    if (file.status === 'extravio_motorista') {
-                        totalMultasMotorista += valorMulta;
-                        totalPedidosMotorista += valorPedido; // Adiciona o valor do pedido
-                        qtyMotorista++;
-                    }
-                    if (file.status === 'extravio_base') {
-                        totalMultasBase += valorMulta;
-                        totalPedidosBase += valorPedido; // Adiciona o valor do pedido
-                        qtyBase++;
-                    }
-                });
-
-                // (NOVA LÓGICA DE CÁLCULO)
-                const totalMultasAplicadas = totalMultasMotorista + totalMultasBase;
-                const totalGeral = totalPedidos + totalMultasAplicadas;
-
-                // 4. Atualizar UI do Resumo
-                totalPedidosValorEl.textContent = formatCurrency(totalPedidos);
-                totalPedidosQtyEl.textContent = `${filteredFiles.length} documento(s)`;
-                
-                // Atualiza card "Multas Aplicadas"
-                totalMultasAplicadasValorEl.textContent = formatCurrency(totalMultasAplicadas);
-                totalMultasAplicadasQtyEl.textContent = `${qtyMotorista + qtyBase} documento(s)`;
-
-                // Atualiza card "Extravio Motorista" (ADICIONADO DE VOLTA)
-                totalPedidosMotoristaValorEl.textContent = formatCurrency(totalPedidosMotorista); // Novo
-                totalMultasMotoristaValorEl.textContent = formatCurrency(totalMultasMotorista);
-                totalMultasMotoristaQtyEl.textContent = `${qtyMotorista} documento(s)`;
-
-                // Atualiza card "Extravio Base" (ADICIONADO DE VOLTA)
-                totalPedidosBaseValorEl.textContent = formatCurrency(totalPedidosBase); // Novo
-                totalMultasBaseValorEl.textContent = formatCurrency(totalMultasBase);
-                totalMultasBaseQtyEl.textContent = `${qtyBase} documento(s)`;
-
-                // Atualiza "Valor Geral"
-                totalGeralValorEl.textContent = formatCurrency(totalGeral);
-                totalGeralQtyEl.textContent = `${filteredFiles.length} documento(s)`;
-                
-                // 5. Renderizar Tabela
-                reportTableBody.innerHTML = ''; // Limpa a tabela
-                if (filteredFiles.length === 0) {
-                    reportTableBody.innerHTML = `<tr id="empty-state-report"><td colspan="10" class="text-center py-10 text-slate-500">Nenhum documento encontrado para este filtro.</td></tr>`;
-                } else {
-                    // Ordena por data de envio (mais recente primeiro)
-                    filteredFiles.sort((a, b) => (b.uploadDate || 0) - (a.uploadDate || 0));
-                    filteredFiles.forEach(file => {
-                        reportTableBody.insertAdjacentHTML('beforeend', createReportRow(file));
-                    });
-                }
-            }
-
-            // --- Função para criar linha do relatório (com edição) ---
-            function createReportRow(file) {
-                const uploadDateFormatted = file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D';
-                const pedidoNum = extractPedidoNum(file.fileName);
-                const motoristaName = extractMotorista(file.fileName); // NOVO
-                const valorPedido = file.valorPedido || 0;
-                const valorMulta = file.valorMulta || 0;
-                const valorTotal = valorPedido + valorMulta; // NOVO CÁLCULO
-                
-                let statusText = 'N/D';
-                let statusClass = 'bg-slate-100 text-slate-800';
-
-                switch(file.status) {
-                    case 'pending': statusText = 'Pendente'; statusClass = 'bg-indigo-100 text-indigo-800'; break;
-                    case 'impresso': statusText = 'Impresso'; statusClass = 'bg-sky-100 text-sky-800'; break;
-                    case 'expired': statusText = 'Vencido'; statusClass = 'bg-red-100 text-red-800'; break;
-                    case 'extravio_motorista': statusText = 'Extravio Motorista'; statusClass = 'bg-orange-100 text-orange-800'; break;
-                    case 'extravio_base': statusText = 'Extravio Base'; statusClass = 'bg-teal-100 text-teal-800'; break;
-                }
+            emptyState.classList.add('hidden');
+            tbody.innerHTML = filteredDocuments.map(docData => {
+                const statusMap = {
+                    'pending': { label: 'Pendente', class: 'bg-indigo-50 text-indigo-600' },
+                    'impresso': { label: 'Impresso', class: 'bg-sky-50 text-sky-600' },
+                    'extravio_motorista': { label: 'Multa Motorista', class: 'bg-orange-50 text-orange-600 border-orange-100' },
+                    'extravio_base': { label: 'Multa Base', class: 'bg-teal-50 text-teal-600 border-teal-100' },
+                    'expired': { label: 'Vencido', class: 'bg-rose-50 text-rose-600' }
+                };
+                const s = statusMap[docData.status] || { label: 'Pendente', class: 'bg-slate-100 text-slate-500' };
+                const total = (docData.valorPedido || 0) + (docData.valorMulta || 0);
 
                 return `
-                    <tr class="bg-white hover:bg-slate-50" data-id="${file.id}">
-                        <td class="px-6 py-4 font-medium text-slate-900 whitespace-nowrap" title="${file.fileName}">${file.fileName}</td>
-                        <td class="px-6 py-4">${pedidoNum}</td>
-                        <td class="px-6 py-4">${motoristaName}</td>
-                        <td class="px-6 py-4">${file.folderName || 'N/D'}</td>
-                        <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}">${statusText}</span></td>
-                        
-                        <!-- Coluna Valor Pedido (Editável) -->
+                    <tr class="hover:bg-slate-50/50 transition-colors" data-id="${docData.id}">
                         <td class="px-6 py-4">
-                            <span class="edit-span" id="valor-pedido-span-${file.id}">${formatCurrency(valorPedido)}</span>
-                            <input type="number" value="${valorPedido}" id="valor-pedido-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                            <div class="font-bold text-slate-800 text-sm truncate max-w-[220px]">${docData.fileName}</div>
+                            <div class="text-[10px] text-slate-400 mt-0.5 font-bold uppercase">${extractMotorista(docData.fileName)}</div>
                         </td>
-                        
-                        <!-- Coluna Valor Multa (Editável) -->
+                        <td class="px-6 py-4 font-mono text-xs text-slate-500">${extractPedido(docData.fileName)}</td>
                         <td class="px-6 py-4">
-                            <span class="edit-span" id="valor-multa-span-${file.id}">${formatCurrency(valorMulta)}</span>
-                            <input type="number" value="${valorMulta}" id="valor-multa-input-${file.id}" class="edit-input w-28 px-2 py-1 border border-slate-300 rounded-md text-sm">
+                            <span class="px-3 py-1 rounded-lg text-[9px] font-bold uppercase ${s.class}">${s.label}</span>
                         </td>
-                        
-                        <!-- NOVA COLUNA VALOR TOTAL -->
-                        <td class="px-6 py-4 font-medium text-slate-700">
-                            ${formatCurrency(valorTotal)}
+                        <td class="px-6 py-4 text-right whitespace-nowrap">
+                            <span class="edit-span font-bold text-slate-700">${fmtBRL(docData.valorPedido)}</span>
+                            <input type="number" step="0.01" value="${docData.valorPedido || 0}" class="edit-input w-24 text-right px-2 py-1 border border-indigo-200 rounded-lg text-xs outline-none">
                         </td>
-                        
-                        <td class="px-6 py-4">${uploadDateFormatted}</td>
-                        
-                        <!-- Coluna Ações (Editar/Salvar) -->
+                        <td class="px-6 py-4 text-right whitespace-nowrap">
+                            <span class="edit-span font-bold text-slate-700">${fmtBRL(docData.valorMulta)}</span>
+                            <input type="number" step="0.01" value="${docData.valorMulta || 0}" class="edit-input w-24 text-right px-2 py-1 border border-indigo-200 rounded-lg text-xs outline-none">
+                        </td>
+                        <td class="px-6 py-4 text-right font-bold text-slate-900 whitespace-nowrap">${fmtBRL(total)}</td>
+                        <td class="px-6 py-4 text-[10px] text-slate-400 font-bold">${fmtDate(docData.uploadDate)}</td>
                         <td class="px-6 py-4 text-center">
-                            <button title="Editar Valores" class="edit-btn text-indigo-600 hover:text-indigo-800" data-id="${file.id}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
-                            </button>
-                            <button title="Salvar" class="save-btn text-green-600 hover:text-green-800 hidden" data-id="${file.id}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-                            </button>
+                            <button class="edit-btn p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button>
+                            <button class="save-btn hidden p-2 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></button>
                         </td>
-                    </tr>`;
-            }
+                    </tr>
+                `;
+            }).join('');
+        }
 
-            // --- Event Listeners ---
+        function updateSummary() {
+            const totals = filteredDocuments.reduce((acc, curr) => {
+                const vp = curr.valorPedido || 0;
+                const vm = curr.valorMulta || 0;
+                acc.pedidos += vp;
+                if (curr.status === 'extravio_motorista') { acc.multasM += vm; acc.qtyM++; }
+                if (curr.status === 'extravio_base') { acc.multasB += vm; acc.qtyB++; }
+                return acc;
+            }, { pedidos: 0, multasM: 0, multasB: 0, qtyM: 0, qtyB: 0 });
 
-            // Listener de Filtro
-            filterBtn.addEventListener('click', processAndRender);
-            // Adiciona listeners para filtrar ao digitar "Enter"
-            filterPedido.addEventListener('keypress', (e) => e.key === 'Enter' && processAndRender());
-            filterMotorista.addEventListener('keypress', (e) => e.key === 'Enter' && processAndRender());
+            document.getElementById('total-pedidos-valor').textContent = fmtBRL(totals.pedidos);
+            document.getElementById('qty-total-pedidos').textContent = `${filteredDocuments.length} docs`;
+            document.getElementById('total-multas-motorista').textContent = fmtBRL(totals.multasM);
+            document.getElementById('qty-extravio-motorista').textContent = `${totals.qtyM} docs`;
+            document.getElementById('total-multas-base').textContent = fmtBRL(totals.multasB);
+            document.getElementById('qty-extravio-base').textContent = `${totals.qtyB} docs`;
+            document.getElementById('total-geral-valor').textContent = fmtBRL(totals.pedidos + totals.multasM + totals.multasB);
+            document.getElementById('qty-total-geral').textContent = `${filteredDocuments.length} docs`;
+        }
 
-            // (NOVO) Listener do Botão Atualizar
-            refreshBtn.addEventListener('click', () => {
-                if (loadingEl) loadingEl.style.display = 'flex'; // Mostra o spinner
-                showNotification("Buscando dados atualizados...", false);
-                initializeApp(); // Re-executa a função principal
-            });
-
-
-            // Listeners de Ações (Editar/Salvar) na Tabela
-            reportTableBody.addEventListener('click', async (event) => {
-                const editBtn = event.target.closest('.edit-btn');
-                const saveBtn = event.target.closest('.save-btn');
-
-                if (editBtn) {
-                    const fileId = editBtn.dataset.id;
-                    const row = editBtn.closest('tr');
-                    
-                    // Esconde spans, mostra inputs
-                    row.querySelectorAll('.edit-span').forEach(el => el.style.display = 'none');
-                    row.querySelectorAll('.edit-input').forEach(el => el.style.display = 'block');
-                    
-                    // Troca botões
-                    editBtn.style.display = 'none';
-                    row.querySelector('.save-btn').style.display = 'block';
-                }
-
-                if (saveBtn) {
-                    const fileId = saveBtn.dataset.id;
-                    
-                    // Pega novos valores
-                    const novoValorPedido = parseFloat(document.getElementById(`valor-pedido-input-${fileId}`).value) || 0;
-                    const novoValorMulta = parseFloat(document.getElementById(`valor-multa-input-${fileId}`).value) || 0;
-
-                    // Lógica Crítica: Fetch-Modify-Save
-                    const freshData = await getLatestData();
-                    if (!freshData) return; // Erro já notificado
-
-                    const fileIndex = freshData.files.findIndex(f => f.id === fileId);
-                    if (fileIndex > -1) {
-                        freshData.files[fileIndex].valorPedido = novoValorPedido;
-                        freshData.files[fileIndex].valorMulta = novoValorMulta;
-                    }
-
-                    await saveData(freshData); // Salva no npoint
-
-                    // Atualiza o store local e re-renderiza
-                    fullDataStore = freshData;
-                    processAndRender();
-                }
-            });
-
-            // --- Listeners de Exportação ---
-            exportExcelBtn.addEventListener('click', () => {
-                if (filteredDataStore.length === 0) {
-                    showNotification("Nenhum dado para exportar.", true);
-                    return;
-                }
-
-                // Prepara dados para Excel
-                const dataToExport = filteredDataStore.map(file => ({
-                    "Nome do Arquivo": file.fileName,
-                    "Nº Pedido": extractPedidoNum(file.fileName),
-                    "Motorista": extractMotorista(file.fileName),
-                    "Pasta (Data Envio)": file.folderName,
-                    "Status": file.status,
-                    "Valor Pedido (S/ Multa) (R$)": file.valorPedido || 0,
-                    "Valor Multa (R$)": file.valorMulta || 0,
-                    "Valor Total (C/ Multa) (R$)": (file.valorPedido || 0) + (file.valorMulta || 0),
-                    "Data Envio": file.uploadDate ? new Date(file.uploadDate).toLocaleString('pt-BR') : 'N/D',
-                    "Prazo Final": file.deadline ? new Date(file.deadline).toLocaleString('pt-BR') : 'N/D'
-                }));
-
-                const ws = XLSX.utils.json_to_sheet(dataToExport);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-                XLSX.writeFile(wb, "Relatorio_Acareacoes.xlsx");
-            });
-
-            exportPdfBtn.addEventListener('click', () => {
-                if (filteredDataStore.length === 0) {
-                    showNotification("Nenhum dado para exportar.", true);
-                    return;
-                }
-
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({ orientation: 'landscape' }); // Deixa o PDF mais largo
-
-                // Prepara dados para PDF AutoTable
-                const head = [["Arquivo", "Nº Pedido", "Motorista", "Pasta", "Status", "V. Pedido (S/ M)", "V. Multa", "V. Total (C/ M)", "Data Envio"]];
-                const body = filteredDataStore.map(file => {
-                    const valorPedido = file.valorPedido || 0;
-                    const valorMulta = file.valorMulta || 0;
-                    return [
-                        file.fileName,
-                        extractPedidoNum(file.fileName),
-                        extractMotorista(file.fileName),
-                        file.folderName,
-                        file.status,
-                        formatCurrency(valorPedido),
-                        formatCurrency(valorMulta),
-                        formatCurrency(valorPedido + valorMulta),
-                        file.uploadDate ? new Date(file.uploadDate).toLocaleDateString('pt-BR') : 'N/D'
-                    ];
-                });
-
-                doc.autoTable({
-                    head: head,
-                    body: body,
-                    styles: { fontSize: 6, cellPadding: 1.5 }, // Diminui a fonte
-                    headStyles: { fillColor: [22, 160, 133] }, // Cor verde-água
-                    columnStyles: {
-                        0: { cellWidth: 50 }, // Arquivo
-                        1: { cellWidth: 22 }, // Nº Pedido
-                        2: { cellWidth: 30 }, // Motorista
-                        3: { cellWidth: 15 }, // Pasta
-                        4: { cellWidth: 25 }, // Status
-                        5: { cellWidth: 20 }, // V. Pedido
-                        6: { cellWidth: 20 }, // V. Multa
-                        7: { cellWidth: 22 }, // V. Total
-                        8: { cellWidth: 20 }, // Data Envio
-                    }
-                });
-
-                doc.save("Relatorio_Acareacoes.pdf");
-            });
-
-
-            // --- Inicialização ---
-            async function initializeApp() {
-                try {
-                    const initialData = await getLatestData();
-                    if (initialData) {
-                        fullDataStore = initialData;
-                        processAndRender(); // Renderiza tudo (sem filtro)
-                    } else {
-                        showNotification("Falha ao carregar dados iniciais.", true);
-                    }
-                } catch (error) {
-                    console.error("Erro na inicialização:", error);
-                    showNotification("Erro fatal ao carregar. Tente recarregar a página.", true);
-                } finally {
-                    if (loadingEl) loadingEl.style.display = 'none'; // Sempre esconde o spinner
-                }
-            }
+        function applyFilters() {
+            const start = document.getElementById('filter-date-start').valueAsNumber;
+            const end = document.getElementById('filter-date-end').valueAsNumber;
+            const pedidoTerm = document.getElementById('filter-pedido').value.toLowerCase();
+            const motoristaTerm = document.getElementById('filter-motorista').value.toLowerCase();
+            const filterAll = document.getElementById('filter-status-all').checked;
             
-            initializeApp();
+            const selectedStatuses = [];
+            if (!filterAll) {
+                document.querySelectorAll('.status-filter').forEach(cb => {
+                    if (cb.checked) selectedStatuses.push(cb.id.replace('filter-status-', ''));
+                });
+            }
+
+            filteredDocuments = allDocuments.filter(docData => {
+                const date = docData.uploadDate || 0;
+                if (start && date < start) return false;
+                if (end && date > (end + 86400000)) return false;
+                if (pedidoTerm && !extractPedido(docData.fileName).toLowerCase().includes(pedidoTerm)) return false;
+                if (motoristaTerm && !extractMotorista(docData.fileName).toLowerCase().includes(motoristaTerm)) return false;
+                if (!filterAll && !selectedStatuses.includes(docData.status)) return false;
+                return true;
+            });
+
+            renderTable();
+            updateSummary();
+        }
+
+        // LÓGICA DE MIGRAÇÃO (PARA 251 ITENS)
+        document.getElementById('show-migration-btn').onclick = () => {
+            document.getElementById('migration-console').style.display = 'block';
+        };
+
+        // Ler Ficheiro de Migração
+        document.getElementById('migration-file-input').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const json = JSON.parse(event.target.result);
+                    dataToMigrate = json.files || [];
+                    document.getElementById('migration-log').innerHTML = `Ficheiro detetado!<br>Registos encontrados: <b>${dataToMigrate.length}</b><br><br>Clique em Iniciar para migrar para o Firebase.`;
+                    
+                    const btn = document.getElementById('start-migration-btn');
+                    btn.disabled = false;
+                    btn.classList.remove('bg-slate-200', 'text-slate-400', 'cursor-not-allowed');
+                    btn.classList.add('bg-indigo-600', 'text-white');
+                } catch (err) {
+                    notify("Erro ao ler JSON. Verifique o formato.", "error");
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        document.getElementById('start-migration-btn').onclick = async () => {
+            const log = document.getElementById('migration-log');
+            const btn = document.getElementById('start-migration-btn');
+            const prog = document.getElementById('migration-progress-container');
+            const bar = document.getElementById('migration-bar');
+            const perc = document.getElementById('migration-perc');
+
+            btn.disabled = true;
+            btn.textContent = "Processando Migração...";
+            prog.classList.remove('hidden');
+            log.innerHTML = "Iniciando migração total...<br>";
+
+            let success = 0;
+            let errorCount = 0;
+
+            for (let i = 0; i < dataToMigrate.length; i++) {
+                const item = dataToMigrate[i];
+                try {
+                    // LIMPEZA: Remover fileURL (Base64 pesado) para não quebrar o Firestore
+                    const cleanItem = { ...item };
+                    delete cleanItem.fileURL; 
+                    if (!cleanItem.id) cleanItem.id = Date.now().toString() + i;
+
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'acareacoes', cleanItem.id), cleanItem);
+                    
+                    success++;
+                    const progress = Math.round(((i + 1) / dataToMigrate.length) * 100);
+                    bar.style.width = progress + '%';
+                    perc.textContent = progress + '%';
+                    
+                    if (i % 5 === 0) { // Log a cada 5 itens para não travar o browser
+                        log.innerHTML += `<span class="text-emerald-400">✓ Item ${i+1}/${dataToMigrate.length} migrado</span><br>`;
+                        log.scrollTop = log.scrollHeight;
+                    }
+                } catch (e) {
+                    errorCount++;
+                    log.innerHTML += `<span class="text-rose-400">✗ Erro no ID ${item.id}</span><br>`;
+                }
+            }
+
+            log.innerHTML += `<br><b>MIGRAÇÃO CONCLUÍDA!</b><br>Sucesso: ${success}<br>Erros: ${errorCount}`;
+            btn.textContent = "Migração Terminada";
+            notify(`Migrados ${success} itens com sucesso!`);
+        };
+
+        // Eventos de Tabela e App
+        document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
+        
+        document.getElementById('table-body').addEventListener('click', async (e) => {
+            const row = e.target.closest('tr');
+            if (!row) return;
+            const docId = row.dataset.id;
+            
+            if (e.target.closest('.edit-btn')) {
+                row.classList.add('row-editing');
+                row.querySelector('.edit-btn').classList.add('hidden');
+                row.querySelector('.save-btn').classList.remove('hidden');
+            } else if (e.target.closest('.save-btn')) {
+                const inputs = row.querySelectorAll('.edit-input');
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'acareacoes', docId), {
+                        valorPedido: parseFloat(inputs[0].value) || 0,
+                        valorMulta: parseFloat(inputs[1].value) || 0
+                    });
+                    notify("Alterações guardadas no Firebase.");
+                    row.classList.remove('row-editing');
+                    row.querySelector('.edit-btn').classList.remove('hidden');
+                    row.querySelector('.save-btn').classList.add('hidden');
+                } catch (err) {
+                    notify("Erro ao atualizar base de dados.", "error");
+                }
+            }
         });
+
+        // Inicialização
+        async function initApp() {
+            try {
+                const userCred = await signInAnonymously(auth);
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        const q = query(collectionRef, orderBy('uploadDate', 'desc'));
+                        onSnapshot(q, (snapshot) => {
+                            allDocuments = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                            applyFilters();
+                            document.getElementById('initial-loading').style.display = 'none';
+                        });
+                    }
+                });
+            } catch (err) {
+                notify("Erro fatal de ligação.", "error");
+                document.getElementById('loading-text').textContent = "Erro de Ligação ao Firebase";
+            }
+        }
+
+        initApp();
     </script>
 </body>
 </html>
