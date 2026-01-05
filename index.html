@@ -3,206 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Relatórios | Financeiro</title>
+    <title>Portal de Relatórios</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bibliotecas de Exportação -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         #initial-loading {
-            position: fixed; inset: 0; background: rgba(248, 250, 252, 0.98);
+            position: fixed; inset: 0; background-color: rgba(248, 250, 252, 0.95);
             display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
         }
-        .loading-spinner { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        #bulk-edit-bar { transform: translateY(100%); transition: transform 0.3s ease-in-out; }
-        #bulk-edit-bar.active { transform: translateY(0); }
-        .hidden { display: none !important; }
+        .edit-input { display: none; }
+        .saving-row { position: relative; opacity: 0.6; pointer-events: none; }
+        .row-update { animation: highlight 1.5s ease-out; }
+        @keyframes highlight {
+            0% { background-color: #fef9c3; }
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 pb-24">
+<body class="bg-slate-50">
 
     <!-- Loading Inicial -->
     <div id="initial-loading">
-        <svg class="loading-spinner h-12 w-12 text-indigo-600 mb-4" fill="none" viewBox="0 0 24 24">
+        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <p id="loading-text" class="text-slate-600 font-semibold tracking-tight">Sincronizando base de dados...</p>
-        <div id="loading-fallback" class="hidden mt-6 text-center px-6">
-            <p class="text-xs text-slate-400 mb-4">A base de dados está a demorar a responder.</p>
-            <button onclick="forceHideLoader()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700">
-                Aceder ao Portal Agora
-            </button>
-        </div>
+        <p class="mt-4 text-slate-600 font-medium">Sincronizando portal...</p>
     </div>
 
     <!-- Notificação -->
-    <div id="notification" class="hidden fixed top-5 right-5 z-[110] p-4 rounded-lg shadow-2xl text-white transition-all duration-300 max-w-sm">
-        <p id="notification-message" class="font-medium text-sm"></p>
+    <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 max-w-sm">
+        <p id="notification-message"></p>
     </div>
 
-    <!-- Barra de Edição em Massa -->
-    <div id="bulk-edit-bar" class="fixed bottom-0 inset-x-0 bg-slate-900 text-white p-4 z-40 shadow-2xl border-t border-slate-700">
-        <div class="container mx-auto max-w-7xl flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <span class="bg-indigo-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase"><span id="selected-count">0</span> Selecionados</span>
-                <p class="text-sm font-medium text-slate-300 hidden sm:block tracking-tight">Acções em Massa:</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <select id="bulk-status" class="bg-slate-800 border-slate-700 text-xs rounded px-2 py-1 focus:ring-indigo-500 outline-none">
-                    <option value="">Alterar Status...</option>
-                    <option value="pending">Pendente</option>
-                    <option value="impresso">Impresso</option>
-                    <option value="expired">Vencido</option>
-                    <option value="extravio_motorista">Extravio Motorista</option>
-                    <option value="extravio_base">Extravio Base</option>
-                </select>
-                <input type="number" id="bulk-valor-pedido" placeholder="Valor Pedido" class="bg-slate-800 border-slate-700 text-xs rounded px-2 py-1 w-24 outline-none">
-                <input type="number" id="bulk-valor-multa" placeholder="Valor Multa" class="bg-slate-800 border-slate-700 text-xs rounded px-2 py-1 w-24 outline-none">
-                <button id="apply-bulk-edit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded transition-all shadow-lg shadow-indigo-900/50">
-                    Aplicar e Sincronizar
-                </button>
-                <button id="cancel-bulk" class="text-slate-400 hover:text-white text-xs ml-2 underline">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
-        <header class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
             <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Portal de Relatórios</h1>
-                    <span id="conn-status" class="px-2 py-0.5 rounded bg-slate-200 text-slate-500 text-[9px] font-bold uppercase tracking-widest mt-1">Ligando...</span>
-                </div>
-                <p class="text-slate-500 mt-1">Gestão financeira e controlo de acareações.</p>
+                <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Portal de Relatórios</h1>
+                <p class="text-slate-600 mt-1">Gestão de Acareações e Financeiro J&T</p>
             </div>
-            <div class="flex items-center gap-3">
-                <button id="refresh-btn" class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 text-slate-700 transition-all font-medium text-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    Sincronizar Manual
+            <div class="flex items-center space-x-4 mt-4 sm:mt-0">
+                <button id="refresh-btn" class="p-2.5 bg-white rounded-lg shadow-sm border border-slate-200 text-slate-600 hover:text-indigo-600 transition-all" title="Forçar Atualização">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
-                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo" class="h-10 w-auto opacity-90">
+                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo" class="h-14 w-auto">
             </div>
         </header>
 
         <!-- Filtros -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="md:col-span-1">
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Período de Envio</label>
-                    <div class="flex items-center gap-2">
-                        <input type="date" id="filter-date-start" class="w-full text-xs border-slate-200 rounded-md py-1.5 focus:ring-indigo-500">
-                        <span class="text-slate-400 text-[10px]">a</span>
-                        <input type="date" id="filter-date-end" class="w-full text-xs border-slate-200 rounded-md py-1.5 focus:ring-indigo-500">
-                    </div>
+            <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center uppercase tracking-wider text-xs text-slate-400">Filtros Avançados</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Data Inicial</label>
+                    <input type="date" id="filter-date-start" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Data Final</label>
+                    <input type="date" id="filter-date-end" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nº Pedido</label>
-                    <input type="text" id="filter-pedido" placeholder="Pesquisar pedido..." class="w-full text-xs border-slate-200 rounded-md py-1.5 focus:ring-indigo-500">
+                    <input type="text" id="filter-pedido" placeholder="Procurar..." class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Motorista</label>
-                    <input type="text" id="filter-motorista" placeholder="Pesquisar nome..." class="w-full text-xs border-slate-200 rounded-md py-1.5 focus:ring-indigo-500">
-                </div>
-                <div class="flex items-end">
-                    <button id="filter-btn" class="w-full bg-slate-900 text-white font-bold py-2 rounded-md hover:bg-slate-800 transition-all text-xs tracking-wide">
-                        Actualizar Filtros
-                    </button>
+                    <input type="text" id="filter-motorista" placeholder="Nome..." class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
                 </div>
             </div>
             
-            <div class="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-x-6 gap-y-3">
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" id="filter-status-all" class="rounded text-indigo-600 focus:ring-0" checked>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase group-hover:text-indigo-600 transition-colors">Todos</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" id="filter-status-pending" class="status-filter rounded text-indigo-600 focus:ring-0" checked>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase">Pendentes</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" id="filter-status-impresso" class="status-filter rounded text-sky-600 focus:ring-0" checked>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase">Impressos</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" id="filter-status-expired" class="status-filter rounded text-rose-600 focus:ring-0" checked>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase">Vencidos</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" id="filter-status-extravio_motorista" class="status-filter rounded text-orange-600 focus:ring-0" checked>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase">Ext. Motorista</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" id="filter-status-extravio_base" class="status-filter rounded text-teal-600 focus:ring-0" checked>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase">Ext. Base</span>
-                </label>
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                <div class="flex flex-wrap gap-3">
+                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-all" class="h-3.5 w-3.5 rounded text-indigo-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Todos</span>
+                    </label>
+                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-pending" class="status-filter h-3.5 w-3.5 rounded text-indigo-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Pendentes</span>
+                    </label>
+                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-impresso" class="status-filter h-3.5 w-3.5 rounded text-sky-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Impressos</span>
+                    </label>
+                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-extravio_motorista" class="status-filter h-3.5 w-3.5 rounded text-orange-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Ext. Motorista</span>
+                    </label>
+                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-extravio_base" class="status-filter h-3.5 w-3.5 rounded text-teal-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Ext. Base</span>
+                    </label>
+                </div>
+                <button id="filter-btn" class="bg-indigo-600 text-white font-bold py-2 px-10 rounded-lg hover:bg-indigo-700 transition-all text-sm uppercase tracking-wider">
+                    Filtrar
+                </button>
             </div>
         </div>
 
-        <!-- Dashboard -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+        <!-- Resumo Financeiro -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Pedidos</p>
-                <p id="total-pedidos-valor" class="text-xl font-bold text-slate-900 tracking-tight">R$ 0,00</p>
-                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase"><span id="total-pedidos-qty">0</span> documentos</p>
+                <h3 class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">Valor Pedidos (S/M)</h3>
+                <p id="total-pedidos-valor" class="text-2xl font-bold text-slate-800">R$ 0,00</p>
+                <p id="total-pedidos-qty" class="text-[10px] text-slate-400 mt-1 font-medium">0 documentos</p>
             </div>
-            <div class="bg-amber-50 p-5 rounded-xl border border-amber-100 shadow-sm">
-                <p class="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Total Multas</p>
-                <p id="total-multas-aplicadas-valor" class="text-xl font-bold text-amber-700 tracking-tight">R$ 0,00</p>
-                <p class="text-[10px] text-amber-600 mt-1 font-bold uppercase"><span id="total-multas-aplicadas-qty">0</span> documentos</p>
-            </div>
+
             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <p class="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1">Extravio Motorista</p>
-                <p id="total-multas-motorista-valor" class="text-lg font-bold text-slate-800 mt-1">R$ 0,00</p>
-                <div class="mt-1 flex items-center justify-between text-[9px] text-slate-400 font-bold uppercase">
-                    <span>Pedidos: <span id="total-pedidos-motorista-valor">R$ 0,00</span></span>
-                    <span id="total-multas-motorista-qty">0 docs</span>
-                </div>
+                <h3 class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Total de Multas</h3>
+                <p id="total-multas-aplicadas-valor" class="text-2xl font-bold text-slate-800">R$ 0,00</p>
+                <p id="total-multas-aplicadas-qty" class="text-[10px] text-slate-400 mt-1 font-medium">0 documentos</p>
             </div>
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <p class="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-1">Extravio Base</p>
-                <p id="total-multas-base-valor" class="text-lg font-bold text-slate-800 mt-1">R$ 0,00</p>
-                <div class="mt-1 flex items-center justify-between text-[9px] text-slate-400 font-bold uppercase">
-                    <span>Pedidos: <span id="total-pedidos-base-valor">R$ 0,00</span></span>
-                    <span id="total-multas-base-qty">0 docs</span>
-                </div>
+
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-orange-400">
+                <h3 class="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1">Ext. Motorista</h3>
+                <p id="total-multas-motorista-valor" class="text-xl font-bold text-slate-800">R$ 0,00</p>
+                <p id="total-multas-motorista-qty" class="text-[10px] text-slate-400 font-medium mt-1">0 docs ativos</p>
             </div>
-            <div class="bg-slate-900 p-5 rounded-xl shadow-lg shadow-slate-200">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">Balanço Total</p>
-                <p id="total-geral-valor" class="text-xl font-bold text-white text-center tracking-tight">R$ 0,00</p>
-                <p class="text-[10px] text-slate-500 mt-1 font-bold uppercase text-center tracking-tighter">Soma de Pedidos + Multas</p>
+
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-teal-400">
+                <h3 class="text-[10px] font-bold text-teal-500 uppercase tracking-widest mb-1">Ext. Base</h3>
+                <p id="total-multas-base-valor" class="text-xl font-bold text-slate-800">R$ 0,00</p>
+                <p id="total-multas-base-qty" class="text-[10px] text-slate-400 font-medium mt-1">0 docs ativos</p>
+            </div>
+
+            <div class="bg-slate-800 p-5 rounded-xl shadow-lg text-white">
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">Valor Total Geral</h3>
+                <p id="total-geral-valor" class="text-2xl font-bold text-center">R$ 0,00</p>
+                <p class="text-[9px] text-slate-500 text-center uppercase font-bold mt-2">Soma Final c/ Multas</p>
             </div>
         </div>
 
         <!-- Tabela -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h2 class="text-lg font-bold text-slate-800">Relatório de Acareações</h2>
-                <div class="flex gap-2">
-                    <button id="export-excel-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md shadow-emerald-100">Excel</button>
-                    <button id="export-pdf-btn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md shadow-rose-100">PDF</button>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h2 class="font-bold text-slate-700 text-xs uppercase tracking-wide">Registos Financeiros</h2>
+                <div class="flex space-x-2">
+                    <button id="export-excel-btn" class="bg-emerald-600 text-white text-[10px] font-bold py-1.5 px-4 rounded-lg hover:bg-emerald-700 uppercase">Excel</button>
+                    <button id="export-pdf-btn" class="bg-red-600 text-white text-[10px] font-bold py-1.5 px-4 rounded-lg hover:bg-red-700 uppercase">PDF</button>
                 </div>
             </div>
-            
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left" id="report-table">
-                    <thead class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-bold">
+                <table class="w-full text-sm text-left text-slate-600" id="report-table">
+                    <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-black border-b border-slate-100">
                         <tr>
-                            <th class="px-6 py-4 w-10"><input type="checkbox" id="select-all" class="rounded text-indigo-600 focus:ring-0"></th>
-                            <th class="px-6 py-4">Ficheiro / Pedido</th>
+                            <th class="px-6 py-4">Arquivo</th>
+                            <th class="px-6 py-4">Pedido</th>
                             <th class="px-6 py-4">Motorista</th>
                             <th class="px-6 py-4">Status</th>
                             <th class="px-6 py-4 text-right">V. Pedido</th>
                             <th class="px-6 py-4 text-right">V. Multa</th>
                             <th class="px-6 py-4 text-right">Total</th>
-                            <th class="px-6 py-4 text-center">Acções</th>
+                            <th class="px-6 py-4 text-center">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="report-table-body" class="divide-y divide-slate-100 text-[11px] font-medium">
-                        <tr><td colspan="8" class="text-center py-24 text-slate-400 font-bold uppercase tracking-widest text-xs">A carregar documentos...</td></tr>
+                    <tbody id="report-table-body" class="divide-y divide-slate-100">
+                        <tr id="empty-state-report"><td colspan="8" class="text-center py-20 text-slate-400 animate-pulse font-medium">Aguardando dados...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -210,301 +171,284 @@
     </div>
 
     <script>
-        function forceHideLoader() {
-            const loader = document.getElementById('initial-loading');
-            if (loader) loader.classList.add('hidden');
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             const DATABASE_URL = "https://api.npoint.io/ef789e8a4e2cd9900cf7";
             
+            const UI = {
+                tableBody: document.getElementById('report-table-body'),
+                loading: document.getElementById('initial-loading'),
+                notify: document.getElementById('notification'),
+                notifyMsg: document.getElementById('notification-message'),
+                totalPedVal: document.getElementById('total-pedidos-valor'),
+                totalPedQty: document.getElementById('total-pedidos-qty'),
+                totalMultasVal: document.getElementById('total-multas-aplicadas-valor'),
+                totalMultasQty: document.getElementById('total-multas-aplicadas-qty'),
+                totalMotVal: document.getElementById('total-multas-motorista-valor'),
+                totalMotQty: document.getElementById('total-multas-motorista-qty'),
+                totalBaseVal: document.getElementById('total-multas-base-valor'),
+                totalBaseQty: document.getElementById('total-multas-base-qty'),
+                totalGeralVal: document.getElementById('total-geral-valor')
+            };
+
             let fullDataStore = { files: [] };
             let filteredDataStore = [];
-            let selectedIds = new Set();
             let isSaving = false;
 
-            const loader = document.getElementById('initial-loading');
-            const reportTableBody = document.getElementById('report-table-body');
-            const selectAllCheckbox = document.getElementById('select-all');
-            const bulkBar = document.getElementById('bulk-edit-bar');
-            const selectedCountEl = document.getElementById('selected-count');
-            const connStatusEl = document.getElementById('conn-status');
-            
-            const fmt = (v) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const formatBRL = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-            // Temporizador de falha: se demorar 4s mostra opção manual, 10s fecha.
-            setTimeout(() => document.getElementById('loading-fallback')?.classList.remove('hidden'), 4000);
-            setTimeout(() => forceHideLoader(), 10000);
-
-            function updateConnStatus(status) {
-                if (status === 'online') {
-                    connStatusEl.className = "px-2 py-0.5 rounded bg-emerald-100 text-emerald-600 text-[9px] font-bold uppercase tracking-widest mt-1";
-                    connStatusEl.textContent = "Online";
-                } else if (status === 'offline') {
-                    connStatusEl.className = "px-2 py-0.5 rounded bg-rose-100 text-rose-600 text-[9px] font-bold uppercase tracking-widest mt-1";
-                    connStatusEl.textContent = "Offline / Erro";
-                } else {
-                    connStatusEl.className = "px-2 py-0.5 rounded bg-slate-100 text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1";
-                    connStatusEl.textContent = "Sincronizando";
-                }
+            function extractPedidoNum(fileName) {
+                if (!fileName) return 'N/D';
+                const match = fileName.match(/(\d{9,})(?=\.pdf$)/i);
+                return match ? match[1] : (fileName.replace('.pdf', '').split(' - ').pop() || 'N/D');
             }
 
-            function extractPedido(name) {
-                if (!name) return '---';
-                const match = String(name).match(/(\d{9,})(?=\.pdf$)/i);
-                return match ? match[1] : '---';
-            }
-
-            function extractMotorista(name) {
-                if(!name) return 'N/D';
-                const strName = String(name);
-                let match = strName.match(/Motorista - F GYN 03 - (.*?)(?=\s- \d{9,}\.pdf)/i);
+            function extractMotorista(fileName) {
+                if (!fileName) return 'N/D';
+                let match = fileName.match(/Motorista - F GYN 03 - (.*?)(?=\s- \d{9,}\.pdf)/i);
                 if (match) return match[1].trim();
-                const parts = strName.replace('.pdf', '').split(' - ');
+                const parts = fileName.replace('.pdf', '').split(' - ');
                 return parts.length > 2 ? parts[parts.length - 2].trim() : 'N/D';
             }
 
-            function notify(msg, type = 'success') {
-                const n = document.getElementById('notification');
-                document.getElementById('notification-message').textContent = msg;
-                n.className = `fixed top-5 right-5 z-[110] p-4 rounded-lg shadow-2xl text-white transition-all duration-300 ${type === 'success' ? 'bg-indigo-600' : 'bg-rose-600'}`;
-                n.classList.remove('hidden');
-                setTimeout(() => n.classList.add('hidden'), 5000);
+            function showNotify(message, isError = false) {
+                UI.notifyMsg.textContent = message;
+                UI.notify.className = `fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 font-bold text-xs uppercase tracking-widest ${isError ? 'bg-red-600' : 'bg-emerald-600'}`;
+                UI.notify.classList.remove('hidden');
+                setTimeout(() => UI.notify.classList.add('hidden'), 4000);
             }
 
-            async function fetchData() {
-                updateConnStatus('sync');
+            // --- Lógica de Sincronização ---
+            async function fetchDB() {
                 try {
-                    const controller = new AbortController();
-                    const id = setTimeout(() => controller.abort(), 10000); // 10s timeout
-                    
-                    const res = await fetch(`${DATABASE_URL}?cache=${Date.now()}`, { signal: controller.signal });
-                    clearTimeout(id);
-
-                    if(!res.ok) throw new Error(`Servidor respondeu com erro ${res.status}`);
-                    
+                    const res = await fetch(`${DATABASE_URL}?_=${Date.now()}`);
+                    if (!res.ok) throw new Error("Erro ao ler banco de dados");
                     const data = await res.json();
-                    
-                    // Validação rigorosa dos dados
-                    if (data && data.files) {
-                        fullDataStore = data;
-                    } else if (Array.isArray(data)) {
-                        fullDataStore = { files: data };
-                    } else if (data && typeof data === 'object' && Object.keys(data).length === 0) {
-                        // Caso a base esteja vazia (recém criada no npoint)
-                        fullDataStore = { files: [] };
-                    } else {
-                        throw new Error("Formato de dados inválido.");
-                    }
-                    
-                    updateConnStatus('online');
-                    render();
+                    return data && data.files ? data : { files: [] };
                 } catch (e) {
-                    console.error("Erro na busca:", e);
-                    updateConnStatus('offline');
-                    const reason = e.name === 'AbortError' ? "Tempo de espera esgotado" : (e.message || "Erro desconhecido");
-                    notify(`Erro na Ligação: ${reason}`, "error");
-                    render(); // Renderiza o que houver
-                } finally {
-                    forceHideLoader();
+                    console.error(e);
+                    showNotify("Falha na leitura (npoint.io)", true);
+                    return null;
                 }
             }
 
-            async function saveToServer() {
-                if (isSaving) return;
+            async function syncDB(payload) {
+                if (isSaving) return false;
                 isSaving = true;
-                updateConnStatus('sync');
-                
                 try {
                     const res = await fetch(DATABASE_URL, {
-                        method: 'PUT',
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(fullDataStore)
+                        body: JSON.stringify(payload)
                     });
-                    
-                    if (!res.ok) throw new Error(`Status ${res.status}`);
-                    
-                    updateConnStatus('online');
-                    notify("Base de dados sincronizada!");
+                    if (!res.ok) throw new Error("Erro ao gravar no npoint");
+                    showNotify("Dados salvos com sucesso!");
+                    return true;
                 } catch (e) {
-                    console.error("Erro ao salvar:", e);
-                    updateConnStatus('offline');
-                    notify(`Erro ao Guardar: ${e.message}. Tente novamente.`, "error");
+                    console.error(e);
+                    showNotify("Falha na gravação (npoint.io)", true);
+                    return false;
                 } finally {
                     isSaving = false;
                 }
             }
 
-            function render(refreshTable = true) {
-                const start = document.getElementById('filter-date-start').valueAsNumber;
-                const end = document.getElementById('filter-date-end').valueAsNumber;
-                const pedido = document.getElementById('filter-pedido').value.trim().toLowerCase();
-                const motorista = document.getElementById('filter-motorista').value.trim().toLowerCase();
-                const allStatus = document.getElementById('filter-status-all').checked;
-                const selectedStatus = Array.from(document.querySelectorAll('.status-filter:checked')).map(c => c.id.replace('filter-status-', ''));
+            function processAndRender(fullUpdate = true) {
+                const startDate = document.getElementById('filter-date-start').valueAsNumber;
+                const endDate = document.getElementById('filter-date-end').valueAsNumber;
+                const pedidoF = document.getElementById('filter-pedido').value.trim().toLowerCase();
+                const motoristaF = document.getElementById('filter-motorista').value.trim().toLowerCase();
+                const filterAll = document.getElementById('filter-status-all').checked;
 
-                filteredDataStore = (fullDataStore.files || []).filter(f => {
-                    if (!f) return false;
+                const selStatus = Array.from(document.querySelectorAll('.status-filter'))
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.id.replace('filter-status-', ''));
+
+                filteredDataStore = fullDataStore.files.filter(f => {
                     const date = f.uploadDate || 0;
-                    const matchDate = (!start || date >= start) && (!end || date <= end + 86400000);
-                    const matchStatus = allStatus || selectedStatus.includes(f.status);
-                    const matchPedido = !pedido || extractPedido(f.fileName).toLowerCase().includes(pedido);
-                    const matchMotorista = !motorista || extractMotorista(f.fileName).toLowerCase().includes(motorista);
-                    return matchDate && matchStatus && matchPedido && matchMotorista;
+                    const dateMatch = (!startDate || date >= startDate) && (!endDate || date <= (endDate + 86400000));
+                    const statusMatch = filterAll || selStatus.includes(f.status);
+                    const pedidoMatch = !pedidoF || extractPedidoNum(f.fileName).toLowerCase().includes(pedidoF);
+                    const motoristaMatch = !motoristaF || extractMotorista(f.fileName).toLowerCase().includes(motoristaF);
+                    return dateMatch && statusMatch && pedidoMatch && motoristaMatch;
                 });
 
-                let s = { p: 0, m: 0, pm: 0, mm: 0, pb: 0, mb: 0, qm: 0, qb: 0 };
+                updateSummary();
+                if (fullUpdate) renderTable();
+            }
+
+            function updateSummary() {
+                let tPed = 0, tMultas = 0, tMot = 0, tBase = 0;
+                let qPed = filteredDataStore.length, qMultas = 0, qMot = 0, qBase = 0;
+
                 filteredDataStore.forEach(f => {
-                    const vp = Number(f.valorPedido) || 0;
-                    const vm = Number(f.valorMulta) || 0;
-                    s.p += vp;
-                    if (f.status === 'extravio_motorista') { s.mm += vm; s.pm += vp; s.qm++; s.m += vm; }
-                    if (f.status === 'extravio_base') { s.mb += vm; s.pb += vp; s.qb++; s.m += vm; }
+                    const vP = f.valorPedido || 0;
+                    const vM = f.valorMulta || 0;
+                    tPed += vP;
+                    if (f.status === 'extravio_motorista') { tMultas += vM; tMot += vM; qMot++; qMultas++; }
+                    else if (f.status === 'extravio_base') { tMultas += vM; tBase += vM; qBase++; qMultas++; }
                 });
 
-                document.getElementById('total-pedidos-valor').textContent = fmt(s.p);
-                document.getElementById('total-pedidos-qty').textContent = filteredDataStore.length;
-                document.getElementById('total-multas-aplicadas-valor').textContent = fmt(s.m);
-                document.getElementById('total-multas-aplicadas-qty').textContent = s.qm + s.qb;
-                document.getElementById('total-multas-motorista-valor').textContent = fmt(s.mm);
-                document.getElementById('total-multas-motorista-qty').textContent = `${s.qm} docs`;
-                document.getElementById('total-pedidos-motorista-valor').textContent = fmt(s.pm);
-                document.getElementById('total-multas-base-valor').textContent = fmt(s.mb);
-                document.getElementById('total-multas-base-qty').textContent = `${s.qb} docs`;
-                document.getElementById('total-pedidos-base-valor').textContent = fmt(s.pb);
-                document.getElementById('total-geral-valor').textContent = fmt(s.p + s.m);
-
-                if (!refreshTable) return;
-
-                reportTableBody.innerHTML = filteredDataStore.length ? '' : '<tr><td colspan="8" class="text-center py-24 text-slate-300 font-bold uppercase tracking-widest text-xs">Nenhum documento encontrado.</td></tr>';
-                
-                filteredDataStore.sort((a,b) => (b.uploadDate || 0) - (a.uploadDate || 0)).forEach(f => {
-                    const tr = document.createElement('tr');
-                    tr.className = "hover:bg-slate-50 transition-colors group border-b border-slate-50";
-                    const isChecked = selectedIds.has(f.id);
-                    
-                    const sMap = {
-                        pending: ['Pendente', 'bg-indigo-50 text-indigo-700'],
-                        impresso: ['Impresso', 'bg-sky-50 text-sky-700'],
-                        expired: ['Vencido', 'bg-rose-50 text-rose-700'],
-                        extravio_motorista: ['Extr. Motorista', 'bg-orange-50 text-orange-700'],
-                        extravio_base: ['Extr. Base', 'bg-teal-50 text-teal-700']
-                    };
-                    const [stxt, scls] = sMap[f.status] || ['N/D', 'bg-slate-100'];
-
-                    tr.innerHTML = `
-                        <td class="px-6 py-4"><input type="checkbox" class="row-checkbox rounded border-slate-300 text-indigo-600 focus:ring-0" data-id="${f.id}" ${isChecked ? 'checked' : ''}></td>
-                        <td class="px-6 py-4">
-                            <div class="text-slate-900 truncate w-40 font-bold tracking-tight" title="${f.fileName}">${f.fileName}</div>
-                            <div class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">${extractPedido(f.fileName)}</div>
-                        </td>
-                        <td class="px-6 py-4 text-slate-500 uppercase text-[10px] tracking-tight">${extractMotorista(f.fileName)}</td>
-                        <td class="px-6 py-4"><span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase ${scls}">${stxt}</span></td>
-                        <td class="px-6 py-4 text-right">
-                            <span class="v-mode font-semibold">${fmt(f.valorPedido)}</span>
-                            <input type="number" step="0.01" class="e-mode hidden w-20 text-right border rounded p-1 text-xs" value="${f.valorPedido || 0}">
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <span class="v-mode font-semibold">${fmt(f.valorMulta)}</span>
-                            <input type="number" step="0.01" class="e-mode hidden w-20 text-right border rounded p-1 text-xs" value="${f.valorMulta || 0}">
-                        </td>
-                        <td class="px-6 py-4 text-right font-bold text-slate-800">${fmt((Number(f.valorPedido)||0) + (Number(f.valorMulta)||0))}</td>
-                        <td class="px-6 py-4 text-center">
-                            <button class="edit-trig text-slate-300 hover:text-indigo-600 p-1 transition-colors"><svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg></button>
-                            <button class="save-trig hidden text-emerald-600 p-1"><svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg></button>
-                        </td>
-                    `;
-
-                    const cbox = tr.querySelector('.row-checkbox');
-                    cbox.onchange = () => toggleRow(f.id, cbox.checked);
-
-                    const eTrig = tr.querySelector('.edit-trig');
-                    const sTrig = tr.querySelector('.save-trig');
-                    const ins = tr.querySelectorAll('.e-mode');
-                    const sps = tr.querySelectorAll('.v-mode');
-
-                    eTrig.onclick = () => {
-                        eTrig.classList.add('hidden');
-                        sTrig.classList.remove('hidden');
-                        ins.forEach(i => i.classList.remove('hidden'));
-                        sps.forEach(s => s.classList.add('hidden'));
-                        ins[0].focus();
-                    };
-
-                    sTrig.onclick = async () => {
-                        const vp = parseFloat(ins[0].value) || 0;
-                        const vm = parseFloat(ins[1].value) || 0;
-                        const idx = fullDataStore.files.findIndex(x => x.id === f.id);
-                        if(idx !== -1) {
-                            fullDataStore.files[idx].valorPedido = vp;
-                            fullDataStore.files[idx].valorMulta = vm;
-                        }
-                        render(false);
-                        await saveToServer();
-                        render();
-                    };
-
-                    reportTableBody.appendChild(tr);
-                });
-                updateBulkBar();
+                UI.totalPedVal.textContent = formatBRL(tPed);
+                UI.totalPedQty.textContent = `${qPed} documentos`;
+                UI.totalMultasVal.textContent = formatBRL(tMultas);
+                UI.totalMultasQty.textContent = `${qMultas} documentos`;
+                UI.totalMotVal.textContent = formatBRL(tMot);
+                UI.totalMotQty.textContent = `${qMot} docs ativos`;
+                UI.totalBaseVal.textContent = formatBRL(tBase);
+                UI.totalBaseQty.textContent = `${qBase} docs ativos`;
+                UI.totalGeralVal.textContent = formatBRL(tPed + tMultas);
             }
 
-            function toggleRow(id, checked) {
-                if(checked) selectedIds.add(id); else selectedIds.delete(id);
-                updateBulkBar();
-            }
-
-            function updateBulkBar() {
-                const count = selectedIds.size;
-                selectedCountEl.textContent = count;
-                if(count > 0) bulkBar.classList.add('active'); else bulkBar.classList.remove('active');
-            }
-
-            document.getElementById('apply-bulk-edit').onclick = async () => {
-                const status = document.getElementById('bulk-status').value;
-                const vPedido = document.getElementById('bulk-valor-pedido').value;
-                const vMulta = document.getElementById('bulk-valor-multa').value;
-
-                if(!status && vPedido === "" && vMulta === "") return;
-
-                fullDataStore.files.forEach(f => {
-                    if(selectedIds.has(f.id)) {
-                        if(status) f.status = status;
-                        if(vPedido !== "") f.valorPedido = parseFloat(vPedido);
-                        if(vMulta !== "") f.valorMulta = parseFloat(vMulta);
-                    }
-                });
-
-                selectedIds.clear();
-                selectAllCheckbox.checked = false;
-                render(false);
-                await saveToServer();
-                render();
-                notify("Edição em massa concluída!");
-            };
-
-            document.getElementById('cancel-bulk').onclick = () => {
-                selectedIds.clear();
-                selectAllCheckbox.checked = false;
-                render();
-            };
-
-            selectAllCheckbox.onchange = () => {
-                if(selectAllCheckbox.checked) {
-                    filteredDataStore.forEach(f => selectedIds.add(f.id));
-                } else {
-                    selectedIds.clear();
+            function renderTable() {
+                if (filteredDataStore.length === 0) {
+                    UI.tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">Sem Registos</td></tr>';
+                    return;
                 }
-                render();
+
+                UI.tableBody.innerHTML = filteredDataStore
+                    .sort((a, b) => (b.uploadDate || 0) - (a.uploadDate || 0))
+                    .map(f => createRowHTML(f)).join('');
+            }
+
+            function createRowHTML(f) {
+                const statusMap = {
+                    'pending': 'bg-indigo-50 text-indigo-600',
+                    'impresso': 'bg-sky-50 text-sky-600',
+                    'extravio_motorista': 'bg-orange-50 text-orange-600',
+                    'extravio_base': 'bg-teal-50 text-teal-600',
+                    'expired': 'bg-red-50 text-red-600'
+                };
+                const labelMap = {
+                    'pending': 'Pendente', 'impresso': 'Impresso', 
+                    'extravio_motorista': 'Ext. Motorista', 'extravio_base': 'Ext. Base', 
+                    'expired': 'Vencido'
+                };
+
+                const valP = f.valorPedido || 0;
+                const valM = f.valorMulta || 0;
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors" data-id="${f.id}">
+                        <td class="px-6 py-4 font-bold text-slate-700 truncate max-w-[180px]" title="${f.fileName}">${f.fileName}</td>
+                        <td class="px-6 py-4 text-slate-400 font-medium">${extractPedidoNum(f.fileName)}</td>
+                        <td class="px-6 py-4 text-slate-500 font-semibold">${extractMotorista(f.fileName)}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-[9px] font-black uppercase ${statusMap[f.status] || 'bg-slate-100'}">${labelMap[f.status] || 'N/D'}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="view-mode font-bold">${formatBRL(valP)}</span>
+                            <input type="number" step="0.01" class="edit-mode edit-input w-20 text-right border rounded px-1 outline-none ring-indigo-500 focus:ring-1" value="${valP}">
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="view-mode font-bold">${formatBRL(valM)}</span>
+                            <input type="number" step="0.01" class="edit-mode edit-input w-20 text-right border rounded px-1 outline-none ring-indigo-500 focus:ring-1" value="${valM}">
+                        </td>
+                        <td class="px-6 py-4 text-right font-black text-slate-900 bg-slate-50/50">
+                            ${formatBRL(valP + valM)}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <button class="edit-btn text-indigo-400 hover:text-indigo-600 p-1">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            </button>
+                            <button class="save-btn hidden text-emerald-500 hover:text-emerald-700 p-1">
+                                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            // --- Event Listeners ---
+            UI.tableBody.addEventListener('click', async (e) => {
+                const tr = e.target.closest('tr');
+                if (!tr) return;
+                const id = tr.dataset.id;
+
+                if (e.target.closest('.edit-btn')) {
+                    tr.querySelectorAll('.view-mode').forEach(el => el.classList.add('hidden'));
+                    tr.querySelectorAll('.edit-input').forEach(el => el.style.display = 'inline-block');
+                    tr.querySelector('.edit-btn').classList.add('hidden');
+                    tr.querySelector('.save-btn').classList.remove('hidden');
+                    return;
+                }
+
+                if (e.target.closest('.save-btn')) {
+                    const inputs = tr.querySelectorAll('input');
+                    const newValP = parseFloat(inputs[0].value) || 0;
+                    const newValM = parseFloat(inputs[1].value) || 0;
+
+                    tr.classList.add('saving-row');
+                    
+                    const storeIdx = fullDataStore.files.findIndex(f => f.id === id);
+                    if (storeIdx > -1) {
+                        fullDataStore.files[storeIdx].valorPedido = newValP;
+                        fullDataStore.files[storeIdx].valorMulta = newValM;
+                    }
+
+                    // Sincronizar com o servidor
+                    const success = await syncDB(fullDataStore);
+                    
+                    if (success) {
+                        tr.classList.add('row-update');
+                        tr.querySelector('td:nth-child(5) .view-mode').textContent = formatBRL(newValP);
+                        tr.querySelector('td:nth-child(6) .view-mode').textContent = formatBRL(newValM);
+                        tr.querySelector('td:nth-child(7)').textContent = formatBRL(newValP + newValM);
+                        updateSummary();
+                    }
+
+                    tr.classList.remove('saving-row');
+                    tr.querySelectorAll('.view-mode').forEach(el => el.classList.remove('hidden'));
+                    tr.querySelectorAll('.edit-input').forEach(el => el.style.display = 'none');
+                    tr.querySelector('.edit-btn').classList.remove('hidden');
+                    tr.querySelector('.save-btn').classList.add('hidden');
+                    
+                    setTimeout(() => tr.classList.remove('row-update'), 1500);
+                }
+            });
+
+            document.getElementById('filter-btn').onclick = () => processAndRender(true);
+            document.getElementById('refresh-btn').onclick = async () => {
+                UI.loading.style.display = 'flex';
+                const data = await fetchDB();
+                if (data) { fullDataStore = data; processAndRender(true); }
+                UI.loading.style.display = 'none';
             };
 
-            document.getElementById('filter-btn').onclick = () => render();
-            document.getElementById('refresh-btn').onclick = () => {
-                fetchData();
+            // Export Excel
+            document.getElementById('export-excel-btn').onclick = () => {
+                if (!filteredDataStore.length) return showNotify("Nada para exportar", true);
+                const sheet = XLSX.utils.json_to_sheet(filteredDataStore.map(f => ({
+                    Arquivo: f.fileName, Pedido: extractPedidoNum(f.fileName), Motorista: extractMotorista(f.fileName),
+                    Status: f.status, Valor: f.valorPedido || 0, Multa: f.valorMulta || 0, Total: (f.valorPedido||0)+(f.valorMulta||0)
+                })));
+                const book = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(book, sheet, "Relatorio");
+                XLSX.writeFile(book, "Relatorio.xlsx");
             };
 
-            // Início
-            fetchData();
+            // Export PDF
+            document.getElementById('export-pdf-btn').onclick = () => {
+                if (!filteredDataStore.length) return showNotify("Nada para exportar", true);
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('l', 'pt');
+                doc.autoTable({
+                    head: [['Arquivo', 'Pedido', 'Motorista', 'Status', 'Valor', 'Multa', 'Total']],
+                    body: filteredDataStore.map(f => [
+                        f.fileName, extractPedidoNum(f.fileName), extractMotorista(f.fileName),
+                        f.status, formatBRL(f.valorPedido||0), formatBRL(f.valorMulta||0), 
+                        formatBRL((f.valorPedido||0)+(f.valorMulta||0))
+                    ]),
+                    styles: { fontSize: 8 }
+                });
+                doc.save("Relatorio.pdf");
+            };
+
+            // Inicialização
+            (async () => {
+                const data = await fetchDB();
+                if (data) { fullDataStore = data; processAndRender(true); }
+                UI.loading.style.display = 'none';
+            })();
         });
     </script>
 </body>
