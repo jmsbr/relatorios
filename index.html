@@ -73,7 +73,7 @@
         <div class="flex justify-between items-center mb-4">
             <div class="flex items-center space-x-2">
                 <div class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
-                <h3 class="font-bold text-slate-800">Migração de Dados (251 itens)</h3>
+                <h3 class="font-bold text-slate-800">Migração de Dados</h3>
             </div>
             <button onclick="document.getElementById('migration-console').style.display='none'" class="text-slate-400 hover:text-slate-600">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
@@ -116,7 +116,7 @@
             <div class="flex items-center space-x-3 mt-4 sm:mt-0">
                 <button id="show-migration-btn" class="bg-amber-50 text-amber-600 hover:bg-amber-100 px-4 py-2 rounded-xl font-bold text-xs uppercase transition-all flex items-center">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                    Migrar 251 Itens
+                    Migrar Dados
                 </button>
                 <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logótipo J&T Express" class="h-10 w-auto">
             </div>
@@ -200,8 +200,14 @@
             <div class="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100">
                 <h2 class="text-xl font-bold text-slate-800">Listagem Consolidada</h2>
                 <div class="flex space-x-3 mt-4 sm:mt-0">
-                    <button id="export-excel-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-xl flex items-center transition-all text-xs">Exportar Excel</button>
-                    <button id="export-pdf-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-5 rounded-xl flex items-center transition-all text-xs">Gerar PDF</button>
+                    <button id="export-excel-btn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-xl flex items-center transition-all text-xs">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Exportar Excel
+                    </button>
+                    <button id="export-pdf-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-5 rounded-xl flex items-center transition-all text-xs">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        Gerar PDF
+                    </button>
                 </div>
             </div>
 
@@ -257,7 +263,10 @@
         let filteredDocuments = [];
         let dataToMigrate = [];
         
-        const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'acareacoes');
+        // --- ATUALIZAÇÃO DO CAMINHO CORRETO ---
+        // Alterado de 'acareacoes' para 'acareacoesRelatórios'
+        const COLLECTION_NAME = 'acareacoesRelatórios'; 
+        const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME);
 
         // Helpers
         const fmtBRL = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -384,7 +393,7 @@
             updateSummary();
         }
 
-        // LÓGICA DE MIGRAÇÃO (PARA 251 ITENS)
+        // LÓGICA DE MIGRAÇÃO
         document.getElementById('show-migration-btn').onclick = () => {
             document.getElementById('migration-console').style.display = 'block';
         };
@@ -422,7 +431,7 @@
             btn.disabled = true;
             btn.textContent = "Processando Migração...";
             prog.classList.remove('hidden');
-            log.innerHTML = "Iniciando migração total...<br>";
+            log.innerHTML = `Iniciando migração para <b>${COLLECTION_NAME}</b>...<br>`;
 
             let success = 0;
             let errorCount = 0;
@@ -430,25 +439,27 @@
             for (let i = 0; i < dataToMigrate.length; i++) {
                 const item = dataToMigrate[i];
                 try {
-                    // LIMPEZA: Remover fileURL (Base64 pesado) para não quebrar o Firestore
+                    // LIMPEZA: Remover fileURL
                     const cleanItem = { ...item };
                     delete cleanItem.fileURL; 
                     if (!cleanItem.id) cleanItem.id = Date.now().toString() + i;
 
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'acareacoes', cleanItem.id), cleanItem);
+                    // CAMINHO ATUALIZADO NO SETDOC
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, cleanItem.id), cleanItem);
                     
                     success++;
                     const progress = Math.round(((i + 1) / dataToMigrate.length) * 100);
                     bar.style.width = progress + '%';
                     perc.textContent = progress + '%';
                     
-                    if (i % 5 === 0) { // Log a cada 5 itens para não travar o browser
+                    if (i % 5 === 0) { 
                         log.innerHTML += `<span class="text-emerald-400">✓ Item ${i+1}/${dataToMigrate.length} migrado</span><br>`;
                         log.scrollTop = log.scrollHeight;
                     }
                 } catch (e) {
                     errorCount++;
                     log.innerHTML += `<span class="text-rose-400">✗ Erro no ID ${item.id}</span><br>`;
+                    console.error(e);
                 }
             }
 
@@ -456,6 +467,60 @@
             btn.textContent = "Migração Terminada";
             notify(`Migrados ${success} itens com sucesso!`);
         };
+
+        // EXPORTAÇÃO EXCEL
+        document.getElementById('export-excel-btn').addEventListener('click', () => {
+            if (filteredDocuments.length === 0) return notify("Sem dados para exportar", "error");
+            
+            const exportData = filteredDocuments.map(d => ({
+                'ID': d.id,
+                'Ficheiro': d.fileName,
+                'Motorista': extractMotorista(d.fileName),
+                'Pedido': extractPedido(d.fileName),
+                'Status': d.status,
+                'Valor Pedido': d.valorPedido || 0,
+                'Valor Multa': d.valorMulta || 0,
+                'Total': (d.valorPedido || 0) + (d.valorMulta || 0),
+                'Data Upload': fmtDate(d.uploadDate)
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+            XLSX.writeFile(wb, `relatorio_acareacoes_${new Date().toISOString().slice(0,10)}.xlsx`);
+            notify("Download Excel iniciado!");
+        });
+
+        // EXPORTAÇÃO PDF
+        document.getElementById('export-pdf-btn').addEventListener('click', () => {
+            if (filteredDocuments.length === 0) return notify("Sem dados para exportar", "error");
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.text("Relatório de Acareações - J&T Express", 14, 20);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 28);
+
+            const tableData = filteredDocuments.map(d => [
+                extractMotorista(d.fileName),
+                extractPedido(d.fileName),
+                d.status,
+                fmtBRL(d.valorPedido),
+                fmtBRL(d.valorMulta),
+                fmtBRL((d.valorPedido || 0) + (d.valorMulta || 0)),
+                fmtDate(d.uploadDate)
+            ]);
+
+            doc.autoTable({
+                startY: 35,
+                head: [['Motorista', 'Pedido', 'Status', 'V. Pedido', 'V. Multa', 'Total', 'Data']],
+                body: tableData,
+            });
+
+            doc.save(`relatorio_acareacoes_${new Date().toISOString().slice(0,10)}.pdf`);
+            notify("Download PDF iniciado!");
+        });
 
         // Eventos de Tabela e App
         document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
@@ -472,7 +537,8 @@
             } else if (e.target.closest('.save-btn')) {
                 const inputs = row.querySelectorAll('.edit-input');
                 try {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'acareacoes', docId), {
+                    // CAMINHO ATUALIZADO NO UPDATEDOC
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, docId), {
                         valorPedido: parseFloat(inputs[0].value) || 0,
                         valorMulta: parseFloat(inputs[1].value) || 0
                     });
@@ -481,6 +547,7 @@
                     row.querySelector('.edit-btn').classList.remove('hidden');
                     row.querySelector('.save-btn').classList.add('hidden');
                 } catch (err) {
+                    console.error(err);
                     notify("Erro ao atualizar base de dados.", "error");
                 }
             }
@@ -497,6 +564,9 @@
                             allDocuments = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                             applyFilters();
                             document.getElementById('initial-loading').style.display = 'none';
+                        }, (error) => {
+                            console.error("Erro no onSnapshot:", error);
+                            notify("Erro ao ler dados em tempo real.", "error");
                         });
                     }
                 });
