@@ -13,144 +13,151 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         #initial-loading {
-            position: fixed; inset: 0; background-color: rgba(248, 250, 252, 0.95);
+            position: fixed; inset: 0; background-color: rgba(248, 250, 252, 0.98);
             display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100;
         }
         .edit-input { display: none; }
-        .saving-row { position: relative; opacity: 0.6; pointer-events: none; }
-        .row-update { animation: highlight 1.5s ease-out; }
-        @keyframes highlight {
-            0% { background-color: #fef9c3; }
-            100% { background-color: transparent; }
+        .row-saving { background-color: #f1f5f9; opacity: 0.7; }
+        .sync-indicator { display: none; }
+        .is-syncing .sync-indicator { display: inline-flex; }
+        
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
+        .sync-pulse { animation: pulse-subtle 2s infinite; }
     </style>
 </head>
 <body class="bg-slate-50">
 
     <!-- Loading Inicial -->
     <div id="initial-loading">
-        <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="mt-4 text-slate-600 font-medium">Sincronizando portal...</p>
+        <div class="relative flex items-center justify-center">
+            <div class="absolute w-16 h-16 border-4 border-indigo-100 rounded-full"></div>
+            <div class="absolute w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <p class="mt-8 text-slate-600 font-bold uppercase tracking-widest text-xs">A Sincronizar Dados...</p>
     </div>
 
     <!-- Notificação -->
     <div id="notification" class="hidden fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 max-w-sm">
-        <p id="notification-message"></p>
+        <p id="notification-message" class="text-sm font-bold"></p>
     </div>
 
     <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl">
         <header class="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
             <div>
-                <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Portal de Relatórios</h1>
-                <p class="text-slate-600 mt-1">Gestão de Acareações e Financeiro J&T</p>
+                <div class="flex items-center space-x-3">
+                    <h1 class="text-3xl font-black text-slate-800 tracking-tighter">Portal de Relatórios</h1>
+                    <div id="global-sync-badge" class="sync-indicator items-center space-x-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase sync-pulse">
+                        <span>A Gravar...</span>
+                    </div>
+                </div>
+                <p class="text-slate-500 mt-1 font-medium">Gestão Financeira e Operacional J&T Express</p>
             </div>
             <div class="flex items-center space-x-4 mt-4 sm:mt-0">
-                <button id="refresh-btn" class="p-2.5 bg-white rounded-lg shadow-sm border border-slate-200 text-slate-600 hover:text-indigo-600 transition-all" title="Forçar Atualização">
+                <button id="refresh-btn" class="p-2.5 bg-white rounded-xl shadow-sm border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all active:scale-95" title="Atualizar Agora">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
-                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo" class="h-14 w-auto">
+                <img src="https://www.jtexpress.com.br/mobile/static/png/leader_1-c3f7a853.png" alt="Logo" class="h-12 w-auto opacity-90">
             </div>
         </header>
 
         <!-- Filtros -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8">
-            <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center uppercase tracking-wider text-xs text-slate-400">Filtros Avançados</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Data Inicial</label>
-                    <input type="date" id="filter-date-start" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Início do Período</label>
+                    <input type="date" id="filter-date-start" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Data Final</label>
-                    <input type="date" id="filter-date-end" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Fim do Período</label>
+                    <input type="date" id="filter-date-end" class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nº Pedido</label>
-                    <input type="text" id="filter-pedido" placeholder="Procurar..." class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Número do Pedido</label>
+                    <input type="text" id="filter-pedido" placeholder="Ex: 123..." class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Motorista</label>
-                    <input type="text" id="filter-motorista" placeholder="Nome..." class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Nome Motorista</label>
+                    <input type="text" id="filter-motorista" placeholder="Procurar..." class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
                 </div>
             </div>
             
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 border-t border-slate-100">
-                <div class="flex flex-wrap gap-3">
-                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-all" class="h-3.5 w-3.5 rounded text-indigo-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Todos</span>
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-6 border-t border-slate-50">
+                <div class="flex flex-wrap gap-2">
+                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-all" class="w-4 h-4 rounded text-indigo-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase">Todos</span>
                     </label>
-                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-pending" class="status-filter h-3.5 w-3.5 rounded text-indigo-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Pendentes</span>
+                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-pending" class="status-filter w-4 h-4 rounded text-indigo-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase">Pendentes</span>
                     </label>
-                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-impresso" class="status-filter h-3.5 w-3.5 rounded text-sky-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Impressos</span>
+                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-impresso" class="status-filter w-4 h-4 rounded text-sky-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase text-sky-600">Impressos</span>
                     </label>
-                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-extravio_motorista" class="status-filter h-3.5 w-3.5 rounded text-orange-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Ext. Motorista</span>
+                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-extravio_motorista" class="status-filter w-4 h-4 rounded text-orange-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase text-orange-600">Ext. Motorista</span>
                     </label>
-                    <label class="inline-flex items-center px-3 py-1 bg-slate-50 rounded-full border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
-                        <input type="checkbox" id="filter-status-extravio_base" class="status-filter h-3.5 w-3.5 rounded text-teal-600 focus:ring-0" checked> 
-                        <span class="ml-2 text-xs font-semibold text-slate-600 uppercase">Ext. Base</span>
+                    <label class="inline-flex items-center px-4 py-1.5 bg-slate-50 rounded-lg border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+                        <input type="checkbox" id="filter-status-extravio_base" class="status-filter w-4 h-4 rounded text-teal-600 focus:ring-0" checked> 
+                        <span class="ml-2 text-xs font-bold text-slate-500 uppercase text-teal-600">Ext. Base</span>
                     </label>
                 </div>
-                <button id="filter-btn" class="bg-indigo-600 text-white font-bold py-2 px-10 rounded-lg hover:bg-indigo-700 transition-all text-sm uppercase tracking-wider">
-                    Filtrar
+                <button id="filter-btn" class="bg-slate-800 text-white font-black py-3 px-12 rounded-xl hover:bg-slate-900 transition-all text-xs uppercase tracking-widest shadow-lg shadow-slate-200">
+                    Filtrar Dados
                 </button>
             </div>
         </div>
 
         <!-- Resumo Financeiro -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">Valor Pedidos (S/M)</h3>
-                <p id="total-pedidos-valor" class="text-2xl font-bold text-slate-800">R$ 0,00</p>
-                <p id="total-pedidos-qty" class="text-[10px] text-slate-400 mt-1 font-medium">0 documentos</p>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm transition-transform hover:scale-[1.02]">
+                <h3 class="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Valor Pedidos (S/M)</h3>
+                <p id="total-pedidos-valor" class="text-2xl font-black text-slate-800 tracking-tighter">R$ 0,00</p>
+                <p id="total-pedidos-qty" class="text-[10px] text-slate-400 mt-1 font-bold">0 documentos</p>
             </div>
 
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-2">Total de Multas</h3>
-                <p id="total-multas-aplicadas-valor" class="text-2xl font-bold text-slate-800">R$ 0,00</p>
-                <p id="total-multas-aplicadas-qty" class="text-[10px] text-slate-400 mt-1 font-medium">0 documentos</p>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm transition-transform hover:scale-[1.02]">
+                <h3 class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">Total de Multas</h3>
+                <p id="total-multas-aplicadas-valor" class="text-2xl font-black text-slate-800 tracking-tighter">R$ 0,00</p>
+                <p id="total-multas-aplicadas-qty" class="text-[10px] text-slate-400 mt-1 font-bold">0 documentos</p>
             </div>
 
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-orange-400">
-                <h3 class="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1">Ext. Motorista</h3>
-                <p id="total-multas-motorista-valor" class="text-xl font-bold text-slate-800">R$ 0,00</p>
-                <p id="total-multas-motorista-qty" class="text-[10px] text-slate-400 font-medium mt-1">0 docs ativos</p>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-orange-400">
+                <h3 class="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Ext. Motorista</h3>
+                <p id="total-multas-motorista-valor" class="text-xl font-black text-slate-800">R$ 0,00</p>
+                <p id="total-multas-motorista-qty" class="text-[10px] text-slate-400 font-bold mt-1 uppercase">0 documentos</p>
             </div>
 
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-teal-400">
-                <h3 class="text-[10px] font-bold text-teal-500 uppercase tracking-widest mb-1">Ext. Base</h3>
-                <p id="total-multas-base-valor" class="text-xl font-bold text-slate-800">R$ 0,00</p>
-                <p id="total-multas-base-qty" class="text-[10px] text-slate-400 font-medium mt-1">0 docs ativos</p>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-teal-400">
+                <h3 class="text-[10px] font-black text-teal-500 uppercase tracking-widest mb-1">Ext. Base</h3>
+                <p id="total-multas-base-valor" class="text-xl font-black text-slate-800">R$ 0,00</p>
+                <p id="total-multas-base-qty" class="text-[10px] text-slate-400 font-bold mt-1 uppercase">0 documentos</p>
             </div>
 
-            <div class="bg-slate-800 p-5 rounded-xl shadow-lg text-white">
-                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-center">Valor Total Geral</h3>
-                <p id="total-geral-valor" class="text-2xl font-bold text-center">R$ 0,00</p>
-                <p class="text-[9px] text-slate-500 text-center uppercase font-bold mt-2">Soma Final c/ Multas</p>
+            <div class="bg-indigo-600 p-5 rounded-2xl shadow-xl shadow-indigo-100 text-white">
+                <h3 class="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mb-2 text-center">Valor Total Geral</h3>
+                <p id="total-geral-valor" class="text-2xl font-black text-center tracking-tighter">R$ 0,00</p>
+                <p class="text-[8px] text-indigo-300 text-center uppercase font-black mt-2 tracking-tighter">Faturamento + Multas</p>
             </div>
         </div>
 
         <!-- Tabela -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h2 class="font-bold text-slate-700 text-xs uppercase tracking-wide">Registos Financeiros</h2>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="p-5 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+                <h2 class="font-black text-slate-400 text-[10px] uppercase tracking-widest">Base de Dados</h2>
                 <div class="flex space-x-2">
-                    <button id="export-excel-btn" class="bg-emerald-600 text-white text-[10px] font-bold py-1.5 px-4 rounded-lg hover:bg-emerald-700 uppercase">Excel</button>
-                    <button id="export-pdf-btn" class="bg-red-600 text-white text-[10px] font-bold py-1.5 px-4 rounded-lg hover:bg-red-700 uppercase">PDF</button>
+                    <button id="export-excel-btn" class="bg-emerald-50 text-emerald-700 text-[10px] font-black py-2 px-5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest">Excel</button>
+                    <button id="export-pdf-btn" class="bg-red-50 text-red-700 text-[10px] font-black py-2 px-5 rounded-lg border border-red-100 hover:bg-red-100 transition-all uppercase tracking-widest">PDF</button>
                 </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left text-slate-600" id="report-table">
-                    <thead class="bg-slate-50 text-[10px] text-slate-400 uppercase font-black border-b border-slate-100">
+                    <thead class="bg-slate-50/80 text-[10px] text-slate-400 uppercase font-black border-b border-slate-100">
                         <tr>
                             <th class="px-6 py-4">Arquivo</th>
                             <th class="px-6 py-4">Pedido</th>
@@ -162,8 +169,8 @@
                             <th class="px-6 py-4 text-center">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="report-table-body" class="divide-y divide-slate-100">
-                        <tr id="empty-state-report"><td colspan="8" class="text-center py-20 text-slate-400 animate-pulse font-medium">Aguardando dados...</td></tr>
+                    <tbody id="report-table-body" class="divide-y divide-slate-50">
+                        <tr id="empty-state-report"><td colspan="8" class="text-center py-24 text-slate-300 font-bold uppercase text-[10px] tracking-widest animate-pulse">Sincronizando com o npoint...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -187,12 +194,14 @@
                 totalMotQty: document.getElementById('total-multas-motorista-qty'),
                 totalBaseVal: document.getElementById('total-multas-base-valor'),
                 totalBaseQty: document.getElementById('total-multas-base-qty'),
-                totalGeralVal: document.getElementById('total-geral-valor')
+                totalGeralVal: document.getElementById('total-geral-valor'),
+                syncBadge: document.getElementById('global-sync-badge')
             };
 
             let fullDataStore = { files: [] };
             let filteredDataStore = [];
-            let isSaving = false;
+            let isSyncing = false;
+            let pendingSaveTimeout = null;
 
             const formatBRL = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -212,43 +221,55 @@
 
             function showNotify(message, isError = false) {
                 UI.notifyMsg.textContent = message;
-                UI.notify.className = `fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 font-bold text-xs uppercase tracking-widest ${isError ? 'bg-red-600' : 'bg-emerald-600'}`;
+                UI.notify.className = `fixed top-5 right-5 z-50 p-4 rounded-xl shadow-2xl text-white transition-all duration-300 font-black text-[10px] uppercase tracking-widest ${isError ? 'bg-red-500' : 'bg-indigo-600'}`;
                 UI.notify.classList.remove('hidden');
                 setTimeout(() => UI.notify.classList.add('hidden'), 4000);
             }
 
-            // --- Lógica de Sincronização ---
+            // --- Lógica de Sincronização Otimizada ---
             async function fetchDB() {
                 try {
                     const res = await fetch(`${DATABASE_URL}?_=${Date.now()}`);
-                    if (!res.ok) throw new Error("Erro ao ler banco de dados");
+                    if (!res.ok) throw new Error();
                     const data = await res.json();
-                    return data && data.files ? data : { files: [] };
+                    return data && Array.isArray(data.files) ? data : { files: [] };
                 } catch (e) {
-                    console.error(e);
-                    showNotify("Falha na leitura (npoint.io)", true);
+                    showNotify("Erro ao ler dados do servidor", true);
                     return null;
                 }
             }
 
-            async function syncDB(payload) {
-                if (isSaving) return false;
-                isSaving = true;
+            // Função de salvamento otimizada (Debounced)
+            function triggerDelayedSave() {
+                if (pendingSaveTimeout) clearTimeout(pendingSaveTimeout);
+                
+                document.body.classList.add('is-syncing');
+                
+                pendingSaveTimeout = setTimeout(async () => {
+                    await performSync();
+                }, 1500); // Aguarda 1.5s após a última edição para enviar
+            }
+
+            async function performSync(retryCount = 0) {
                 try {
                     const res = await fetch(DATABASE_URL, {
-                        method: 'POST',
+                        method: 'PUT', // PUT é mais fiável para updates no npoint
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(fullDataStore)
                     });
-                    if (!res.ok) throw new Error("Erro ao gravar no npoint");
-                    showNotify("Dados salvos com sucesso!");
-                    return true;
+                    
+                    if (!res.ok) throw new Error();
+                    
+                    document.body.classList.remove('is-syncing');
+                    showNotify("Sincronização Concluída");
                 } catch (e) {
-                    console.error(e);
-                    showNotify("Falha na gravação (npoint.io)", true);
-                    return false;
-                } finally {
-                    isSaving = false;
+                    if (retryCount < 2) {
+                        console.log("Falha no sync, a tentar novamente...");
+                        setTimeout(() => performSync(retryCount + 1), 2000);
+                    } else {
+                        document.body.classList.remove('is-syncing');
+                        showNotify("Erro Crítico: Falha ao gravar no servidor", true);
+                    }
                 }
             }
 
@@ -293,15 +314,15 @@
                 UI.totalMultasVal.textContent = formatBRL(tMultas);
                 UI.totalMultasQty.textContent = `${qMultas} documentos`;
                 UI.totalMotVal.textContent = formatBRL(tMot);
-                UI.totalMotQty.textContent = `${qMot} docs ativos`;
+                UI.totalMotQty.textContent = `${qMot} documentos`;
                 UI.totalBaseVal.textContent = formatBRL(tBase);
-                UI.totalBaseQty.textContent = `${qBase} docs ativos`;
+                UI.totalBaseQty.textContent = `${qBase} documentos`;
                 UI.totalGeralVal.textContent = formatBRL(tPed + tMultas);
             }
 
             function renderTable() {
                 if (filteredDataStore.length === 0) {
-                    UI.tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-20 text-slate-300 font-bold uppercase text-[10px] tracking-widest">Sem Registos</td></tr>';
+                    UI.tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-20 text-slate-300 font-black uppercase text-[10px] tracking-widest">Nenhum Registo Localizado</td></tr>';
                     return;
                 }
 
@@ -328,29 +349,29 @@
                 const valM = f.valorMulta || 0;
 
                 return `
-                    <tr class="hover:bg-slate-50 transition-colors" data-id="${f.id}">
-                        <td class="px-6 py-4 font-bold text-slate-700 truncate max-w-[180px]" title="${f.fileName}">${f.fileName}</td>
-                        <td class="px-6 py-4 text-slate-400 font-medium">${extractPedidoNum(f.fileName)}</td>
-                        <td class="px-6 py-4 text-slate-500 font-semibold">${extractMotorista(f.fileName)}</td>
+                    <tr class="hover:bg-slate-50 transition-colors group" data-id="${f.id}">
+                        <td class="px-6 py-4 font-black text-slate-700 truncate max-w-[180px]" title="${f.fileName}">${f.fileName}</td>
+                        <td class="px-6 py-4 text-slate-400 font-bold">${extractPedidoNum(f.fileName)}</td>
+                        <td class="px-6 py-4 text-slate-500 font-bold">${extractMotorista(f.fileName)}</td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 rounded text-[9px] font-black uppercase ${statusMap[f.status] || 'bg-slate-100'}">${labelMap[f.status] || 'N/D'}</span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <span class="view-mode font-bold">${formatBRL(valP)}</span>
-                            <input type="number" step="0.01" class="edit-mode edit-input w-20 text-right border rounded px-1 outline-none ring-indigo-500 focus:ring-1" value="${valP}">
+                            <span class="view-mode font-black text-slate-800">${formatBRL(valP)}</span>
+                            <input type="number" step="0.01" class="edit-mode edit-input w-24 text-right border border-indigo-200 rounded-lg px-2 py-1 outline-none ring-indigo-500 focus:ring-2" value="${valP}">
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <span class="view-mode font-bold">${formatBRL(valM)}</span>
-                            <input type="number" step="0.01" class="edit-mode edit-input w-20 text-right border rounded px-1 outline-none ring-indigo-500 focus:ring-1" value="${valM}">
+                            <span class="view-mode font-black text-slate-800">${formatBRL(valM)}</span>
+                            <input type="number" step="0.01" class="edit-mode edit-input w-24 text-right border border-indigo-200 rounded-lg px-2 py-1 outline-none ring-indigo-500 focus:ring-2" value="${valM}">
                         </td>
                         <td class="px-6 py-4 text-right font-black text-slate-900 bg-slate-50/50">
                             ${formatBRL(valP + valM)}
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <button class="edit-btn text-indigo-400 hover:text-indigo-600 p-1">
+                            <button class="edit-btn text-slate-300 hover:text-indigo-600 p-2 transition-colors">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                             </button>
-                            <button class="save-btn hidden text-emerald-500 hover:text-emerald-700 p-1">
+                            <button class="save-btn hidden text-emerald-500 hover:text-emerald-700 p-2 transition-colors">
                                 <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                             </button>
                         </td>
@@ -358,7 +379,7 @@
                 `;
             }
 
-            // --- Event Listeners ---
+            // --- Event Listeners Otimizados ---
             UI.tableBody.addEventListener('click', async (e) => {
                 const tr = e.target.closest('tr');
                 if (!tr) return;
@@ -377,58 +398,54 @@
                     const newValP = parseFloat(inputs[0].value) || 0;
                     const newValM = parseFloat(inputs[1].value) || 0;
 
-                    tr.classList.add('saving-row');
-                    
+                    // 1. UI Otimista: Atualizar store local e Resumo
                     const storeIdx = fullDataStore.files.findIndex(f => f.id === id);
                     if (storeIdx > -1) {
                         fullDataStore.files[storeIdx].valorPedido = newValP;
                         fullDataStore.files[storeIdx].valorMulta = newValM;
                     }
 
-                    // Sincronizar com o servidor
-                    const success = await syncDB(fullDataStore);
+                    // 2. Atualizar UI da linha e do Resumo sem recarregar tudo
+                    tr.querySelector('td:nth-child(5) .view-mode').textContent = formatBRL(newValP);
+                    tr.querySelector('td:nth-child(6) .view-mode').textContent = formatBRL(newValM);
+                    tr.querySelector('td:nth-child(7)').textContent = formatBRL(newValP + newValM);
                     
-                    if (success) {
-                        tr.classList.add('row-update');
-                        tr.querySelector('td:nth-child(5) .view-mode').textContent = formatBRL(newValP);
-                        tr.querySelector('td:nth-child(6) .view-mode').textContent = formatBRL(newValM);
-                        tr.querySelector('td:nth-child(7)').textContent = formatBRL(newValP + newValM);
-                        updateSummary();
-                    }
+                    updateSummary();
 
-                    tr.classList.remove('saving-row');
+                    // 3. Voltar ao modo visual
                     tr.querySelectorAll('.view-mode').forEach(el => el.classList.remove('hidden'));
                     tr.querySelectorAll('.edit-input').forEach(el => el.style.display = 'none');
                     tr.querySelector('.edit-btn').classList.remove('hidden');
                     tr.querySelector('.save-btn').classList.add('hidden');
                     
-                    setTimeout(() => tr.classList.remove('row-update'), 1500);
+                    // 4. Agendar Sincronização em background
+                    triggerDelayedSave();
                 }
             });
 
             document.getElementById('filter-btn').onclick = () => processAndRender(true);
+            
             document.getElementById('refresh-btn').onclick = async () => {
                 UI.loading.style.display = 'flex';
                 const data = await fetchDB();
                 if (data) { fullDataStore = data; processAndRender(true); }
                 UI.loading.style.display = 'none';
+                showNotify("Dados Atualizados");
             };
 
-            // Export Excel
+            // Exportações
             document.getElementById('export-excel-btn').onclick = () => {
-                if (!filteredDataStore.length) return showNotify("Nada para exportar", true);
                 const sheet = XLSX.utils.json_to_sheet(filteredDataStore.map(f => ({
-                    Arquivo: f.fileName, Pedido: extractPedidoNum(f.fileName), Motorista: extractMotorista(f.fileName),
-                    Status: f.status, Valor: f.valorPedido || 0, Multa: f.valorMulta || 0, Total: (f.valorPedido||0)+(f.valorMulta||0)
+                    Arquivo: f.fileName, Pedido: extractPedidoNum(f.fileName), 
+                    Motorista: extractMotorista(f.fileName), Status: f.status, 
+                    Valor: f.valorPedido || 0, Multa: f.valorMulta || 0, Total: (f.valorPedido||0)+(f.valorMulta||0)
                 })));
                 const book = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(book, sheet, "Relatorio");
-                XLSX.writeFile(book, "Relatorio.xlsx");
+                XLSX.writeFile(book, "Portal_Relatorios.xlsx");
             };
 
-            // Export PDF
             document.getElementById('export-pdf-btn').onclick = () => {
-                if (!filteredDataStore.length) return showNotify("Nada para exportar", true);
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('l', 'pt');
                 doc.autoTable({
@@ -438,9 +455,9 @@
                         f.status, formatBRL(f.valorPedido||0), formatBRL(f.valorMulta||0), 
                         formatBRL((f.valorPedido||0)+(f.valorMulta||0))
                     ]),
-                    styles: { fontSize: 8 }
+                    styles: { fontSize: 8, font: 'helvetica' }
                 });
-                doc.save("Relatorio.pdf");
+                doc.save("Relatorio_Financeiro.pdf");
             };
 
             // Inicialização
